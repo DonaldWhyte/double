@@ -1,9 +1,5 @@
-macro_rules! mock_method_type_name {
-    ($mock_name:ident, $fname:ident) => ($mock_name::method_types::$fname)
-}
-
 macro_rules! mock_method_type {
-    ($fname:ident, $retval:ty, $($arg:tt)*) => (
+    ($fname:ident, $retval:ty, $($self_prefix_token:tt)+, $($arg_name:ident: $arg_type:ty)*) => (
         pub struct $fname {
             // TODO
         }
@@ -14,17 +10,30 @@ macro_rules! mock_method_type {
                     // TODO
                 }
             }
+
+            pub fn call() -> $retval {
+
+            }
         }
     )
 }
 
 macro_rules! mock_trait {
-    ($trait_name:ident, $mock_name:ident, $(fn $fname:ident($($arg:tt)*) -> $retval:ty $body:block),*) => (
+    ($trait_name:ident, $mock_name:ident,
+     $(fn $fname:ident(($($self_prefix_token:tt)+) self,
+                       $($arg_name:ident: $arg_type:ty,)*)
+                       -> $retval:ty),*
+    ) =>
+    (
+
         mod $mock_name {
             use $trait_name;
 
             pub mod method_types {
-                $(mock_method_type!($fname, $retval, $($arg)*))*;
+                $(mock_method_type!(
+                    $fname, $retval,
+                    $($self_prefix_token)+,
+                    $($arg_name: $arg_type)*))*;
             }
 
             pub struct Methods {
@@ -33,7 +42,6 @@ macro_rules! mock_trait {
 
             impl Methods {
                 pub fn new() -> Methods {
-                    // TODO
                     Methods {
                         $($fname: method_types::$fname::new())*
                     }
@@ -53,7 +61,12 @@ macro_rules! mock_trait {
             }
 
             impl $trait_name for Mock {
-                $(fn $fname($($arg)*) -> $retval $body)*
+                $(
+                    fn $fname($($self_prefix_token)+ self, $($arg_name: $arg_type)*) -> $retval {
+                        //self.m.$fname.call($($arg_name,)*);
+                        self.m.$fname.call();
+                    }
+                )*
             }
         }
     )
@@ -74,6 +87,13 @@ MockTrait -> wraps each MockFunction, just calling the underlying mock function
 
 */
 
+macro_rules! match_args_name_and_type {
+    ($($arg_name:ident: $arg_type:ty),*) => ()
+}
+
+match_args_name_and_type!(foo: i32);
+match_args_name_and_type!(foo: i32, bar: &str);
+
 #[cfg(test)]
 mod tests {
     use self::super::*;
@@ -82,7 +102,7 @@ mod tests {
     mock_trait!(
         FileWriter,
         SomeMock,
-        fn write_contents(&mut self, filename: &str, contents: &str) -> () {}
+        fn write_contents((&mut) self, filename: &str, contents: &str) -> ()
     );
 
     #[test]
