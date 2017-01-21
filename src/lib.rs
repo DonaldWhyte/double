@@ -27,9 +27,7 @@ macro_rules! mock_trait {
             }
         }
 
-        impl $trait_name for $struct_name {
-            $(fn $fname($($arg)*) -> $retval $body)*
-        }
+
     }
 }
 
