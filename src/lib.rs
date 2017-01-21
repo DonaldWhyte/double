@@ -42,8 +42,13 @@ mod tests {
     use self::super::*;
     use std;
 
+    macro_rules! test {
+        () => (fn write_contents(&mut self, filename: &str, contents: &str) -> () {})
+    }
+
     mock_trait!(FileWriter, SomeMock,
-        fn write_contents(&mut self, filename: &str, contents: &str) -> () {}
+        //fn write_contents(&mut self, filename: &str, contents: &str) -> () {}
+        test!()
     );
 
     #[test]
