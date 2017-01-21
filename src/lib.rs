@@ -1,39 +1,78 @@
+macro_rules! mock_method_type_name {
+    ($mock_name:ident, $fname:ident) => ($mock_name::method_types::$fname)
+}
+
+macro_rules! mock_method_type {
+    ($fname:ident, $retval:ty, $($arg:tt)*) => (
+        pub struct $fname {
+            // TODO
+        }
+
+        impl $fname {
+            pub fn new() -> $fname {
+                $fname {
+                    // TODO
+                }
+            }
+        }
+    )
+}
+
 macro_rules! mock_trait {
-    ($trait_name:ident, $struct_name:ident, $(fn $fname:ident($($arg:tt)*) -> $retval:ty $body:block),*) => {
-        struct $struct_name {
-            pub call_counts:
-                std::cell::RefCell<std::collections::HashMap<String, i32>>,
-            pub call_expectations:
-                std::cell::RefCell<std::collections::HashMap<String, i32>>
-        }
+    ($trait_name:ident, $mock_name:ident, $(fn $fname:ident($($arg:tt)*) -> $retval:ty $body:block),*) => (
+        mod $mock_name {
+            use $trait_name;
 
-        impl $struct_name {
-            fn build_func_call_map(func_names: Vec<&str>, initial_value: i32) -> std::collections::HashMap<String, i32> {
-                let mut call_map = std::collections::HashMap::new();
-                for func in func_names {
-                    call_map.insert(func.to_string(), initial_value);
-                }
-                call_map
+            pub mod method_types {
+                $(mock_method_type!($fname, $retval, $($arg)*))*;
             }
 
-            fn new() -> $struct_name {
-                let funcs = vec!($($fname)* );
-                let initial_call_counts = $struct_name::build_func_call_map(funcs, 0);
-                let initial_call_expectations = $struct_name::build_func_call_map(funcs, -1);
-                $struct_name {
-                    call_counts: std::cell::RefCell::new(initial_call_counts),
-                    call_expectations: std::cell::RefCell::new(initial_call_expectations),
+            pub struct Methods {
+                $(pub $fname: method_types::$fname)*
+            }
+
+            impl Methods {
+                pub fn new() -> Methods {
+                    // TODO
+                    Methods {
+                        $($fname: method_types::$fname::new())*
+                    }
                 }
             }
+
+            pub struct Mock {
+                pub m: Methods
+            }
+
+            impl Mock {
+                pub fn new() -> Mock {
+                    Mock {
+                        m: Methods::new()
+                    }
+                }
+            }
+
+            impl $trait_name for Mock {
+                $(fn $fname($($arg)*) -> $retval $body)*
+            }
         }
-
-
-    }
+    )
 }
 
 pub trait FileWriter {
     fn write_contents(&mut self, filename: &str, contents: &str);
 }
+
+/*
+
+MockFunction class --> handles call counts, args, expectations, rerturn values, etc.\
+
+MockTrait -> wraps each MockFunction, just calling the underlying mock function
+  // struct contains instance of wach MockFunction
+  // public function to access raw MockFunction to set expectaitons/retvals
+  // args are: trait name, mock struct name, type names of the MockFunctions
+
+*/
 
 #[cfg(test)]
 mod tests {
@@ -48,7 +87,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut mock = SomeMock::new();
+        let mut mock = SomeMock::Mock::new();
         mock.write_contents("test.txt", "Hello, World!");
     }
 
