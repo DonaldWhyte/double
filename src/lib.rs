@@ -1,41 +1,94 @@
 /*
 
-MockFunction class --> handles call counts, args, expectations, rerturn values, etc.\
+Requirements for mock methods:
 
-MockTrait -> wraps each MockFunction, just calling the underlying mock function
-  // struct contains instance of wach MockFunction
-  // public function to access raw MockFunction to set expectaitons/retvals
-  // args are: trait name, mock struct name, type names of the MockFunctions
+* counting calls
+* counting order of calls
+* be able to match exact call
+*
+* group of args + expected operator (<=, =, >=), sexpected count, expected actions
+* list of calls, stored in call sequence, each containing:
+    - group of args
+
+How to represent matchers? Some ideas:
+
+* function object
 
 */
 
+enum CallCount {
+    Never,
+    Once,
+    Exactly(u32),
+    AtLeast(u32),
+    AtMost(u32),
+    Between(u32, u32)
+}
+
 macro_rules! mock_method_type {
     ( $fname:ident, $retval:ty $( , $arg_name:ident: $arg_type:ty )* ) => (
-        #[allow(non_camel_case_types)]
-        pub struct $fname {
-            // TODO
-        }
+        pub mod $fname {
+            use std::vec::Vec;
+            use CallCount;
 
-        impl $fname {
-            pub fn new() -> $fname {
-                $fname {
-                    // TODO
+            type ReturnValue = $retval;
+
+            struct Expectation {
+                count: CallCount
+                $(, $arg_name: fn($arg_type) -> bool)*
+            }
+
+            impl Expectation {
+                pub fn new(count: CallCount $(, $arg_name: fn($arg_type) -> bool)*)
+                    -> Expectation
+                {
+                    Expectation {
+                        count: count
+                        $(, $arg_name: $arg_name)*
+                    }
                 }
             }
 
-            #[allow(unused_variables)]
-            pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
-                println!("{} called", stringify!($fname));
-                $(
-                    println!("\t{:?}", $arg_name);
-                )*
-                Default::default()
+            pub struct Method {
+                expectations: Vec<Expectation>
             }
-        }
 
-        impl Drop for $fname {
-            fn drop(&mut self) {
-                println!("{} dropped", stringify!($fname));
+            impl Method {
+                pub fn new() -> Method {
+                    Method {
+                        expectations: vec![]
+                    }
+                }
+
+                #[allow(unused_variables)]
+                pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
+                    println!("{} called", stringify!($fname));
+                    $(
+                        println!("\t{:?}", $arg_name);
+                    )*
+                    Default::default()
+                }
+
+                #[allow(unused_variables)]
+                pub fn expect(&mut self, call_count: CallCount
+                              $(, $arg_name: fn($arg_type) -> bool)*)
+                {
+                    self.expectations.push(
+                        Expectation::new(call_count $(, $arg_name)*)
+                    );
+                }
+
+                pub fn check_and_clear_expectations(&mut self) {
+                    // TODO: have unordered check by default
+                    // TODO: checked ordered if some flag is set
+                }
+            }
+
+            impl Drop for Method {
+                fn drop(&mut self) {
+                    println!("{} dropped", stringify!($fname));
+                    self.check_and_clear_expectations();
+                }
             }
         }
     )
@@ -64,13 +117,13 @@ macro_rules! mock_trait {
             }
 
             struct Methods {
-                $(pub $fname: method_types::$fname),*
+                $(pub $fname: method_types::$fname::Method),*
             }
 
             impl Methods {
                 pub fn new() -> Methods {
                     Methods {
-                        $($fname: method_types::$fname::new()),*
+                        $($fname: method_types::$fname::Method::new()),*
                     }
                 }
             }
