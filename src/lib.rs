@@ -25,7 +25,7 @@ macro_rules! mock_method_type {
 
             #[allow(unused_variables)]
             pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
-                println!("Called!");
+                Default::default()
             }
         }
     )
@@ -60,7 +60,7 @@ macro_rules! mock_trait {
             impl Methods {
                 pub fn new() -> Methods {
                     Methods {
-                        $($fname: method_types::$fname::new())*
+                        $($fname: method_types::$fname::new()),*
                     }
                 }
             }
@@ -92,15 +92,45 @@ macro_rules! mock_trait {
     )
 }
 
-pub trait FileWriter {
-    //fn write_contents(&mut self, filename: &str, contents: &str);
-    fn check(&self, filename: &str, foo: i32);
+pub trait TestTrait {
+    fn no_arg(&self);
+    fn no_arg_mut(&mut self);
+    fn one_arg(&self, a: i32);
+    fn one_arg_mut(&mut self, a: i32);
+    fn two_args(&self, a: i32, b: &str);
+    fn two_args_mut(&mut self, a: i32, b: &str);
+    fn three_args(&self, a: i32, b: &str, c: &mut Vec<i32>);
+    fn three_args_mut(&mut self, a: i32, b: &str, c: &mut Vec<i32>);
+
+    fn no_arg_retval(&self) -> Vec<String>;
+    fn no_arg_mut_retval(&mut self) -> Vec<String>;
+    fn one_arg_retval(&self, a: i32) -> Vec<String>;
+    fn one_arg_mut_retval(&mut self, a: i32) -> Vec<String>;
+    fn two_args_retval(&self, a: i32, b: &str) -> Vec<String>;
+    fn two_args_mut_retval(&mut self, a: i32, b: &str) -> Vec<String>;
+    fn three_args_retval(&self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>;
+    fn three_args_mut_retval(&mut self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>;
 }
 
 mock_trait!(
-    FileWriter,
-    MockFileWriter,
-    fn check((&)self, filenane: &str, foo: i32) -> ()
+    TestTrait,
+    MockOfTrait,
+    fn no_arg((&)self) -> (),
+    fn no_arg_mut((&mut)self) -> (),
+    fn one_arg((&)self, a: i32) -> (),
+    fn one_arg_mut((&mut)self, a: i32) -> (),
+    fn two_args((&)self, a: i32, b: &str) -> (),
+    fn two_args_mut((&mut)self, a: i32, b: &str) -> (),
+    fn three_args((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
+    fn three_args_mut((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
+    fn no_arg_retval((&)self) -> Vec<String>,
+    fn no_arg_mut_retval((&mut)self) -> Vec<String>,
+    fn one_arg_retval((&)self, a: i32) -> Vec<String>,
+    fn one_arg_mut_retval((&mut)self, a: i32) -> Vec<String>,
+    fn two_args_retval((&)self, a: i32, b: &str) -> Vec<String>,
+    fn two_args_mut_retval((&mut)self, a: i32, b: &str) -> Vec<String>,
+    fn three_args_retval((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>,
+    fn three_args_mut_retval((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>
 );
 
 
@@ -109,8 +139,7 @@ mock_trait!(Empty, EmptyMock);
 
 fn test() {
     let empty_mocks = EmptyMock::new();
-    let mock = MockFileWriter::new();
-    mock.check("foo", 32);
+    let mock = MockOfTrait::new();
 }
 
 #[cfg(test)]
