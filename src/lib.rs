@@ -41,13 +41,13 @@ macro_rules! mock_trait {
             use std;
             use $trait_name;
 
-            pub mod method_types {
+            mod method_types {
                 $(
                     mock_method_type!($fname, $retval, $($arg_name: $arg_type)*)
                 )*;
             }
 
-            pub struct Methods {
+            struct Methods {
                 $(pub $fname: method_types::$fname,)*
             }
 
@@ -60,7 +60,7 @@ macro_rules! mock_trait {
             }
 
             pub struct Mock {
-                pub m: std::cell::RefCell<Methods>
+                m: std::cell::RefCell<Methods>
             }
 
             impl Mock {
