@@ -10,7 +10,8 @@ MockTrait -> wraps each MockFunction, just calling the underlying mock function
 */
 
 macro_rules! mock_method_type {
-    ($fname:ident, $retval:ty, $($arg_name:ident: $arg_type:ty)*) => (
+    ( $fname:ident, $retval:ty $( , $arg_name:ident: $arg_type:ty )* ) => (
+        #[allow(non_camel_case_types)]
         pub struct $fname {
             // TODO
         }
@@ -22,7 +23,8 @@ macro_rules! mock_method_type {
                 }
             }
 
-            pub fn call(&mut self, $($arg_name: $arg_type)*) -> $retval {
+            #[allow(unused_variables)]
+            pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
                 println!("Called!");
             }
         }
@@ -30,25 +32,29 @@ macro_rules! mock_method_type {
 }
 
 macro_rules! mock_trait {
-    ($trait_name:ident, $mock_name:ident,
-     $(fn $fname:ident(($($self_prefix_token:tt)+)
-                       (self $(, $arg_name:ident: $arg_type:ty)*))
-                       -> $retval:ty),*
-    ) =>
     (
-
+        $trait_name:ident,
+        $mock_name:ident
+        $(, fn $fname:ident(
+            ($($self_prefix_token:tt)+) self $( , $arg_name:ident: $arg_type:ty )*
+          ) -> $retval:ty
+        )*
+    ) => (
+        #[allow(non_snake_case)]
+        #[allow(dead_code)]
         mod $mock_name {
             use std;
             use $trait_name;
 
             mod method_types {
                 $(
-                    mock_method_type!($fname, $retval, $($arg_name: $arg_type)*)
-                )*;
+                    mock_method_type!(
+                        $fname, $retval $(, $arg_name: $arg_type)*);
+                )*
             }
 
             struct Methods {
-                $(pub $fname: method_types::$fname,)*
+                $(pub $fname: method_types::$fname),*
             }
 
             impl Methods {
@@ -73,10 +79,14 @@ macro_rules! mock_trait {
 
             impl $trait_name for Mock {
                 $(
-                    fn $fname($($self_prefix_token)+ self, $($arg_name: $arg_type)*) -> $retval {
-                        self.m.borrow_mut().$fname.call($($arg_name,)*);
+                    fn $fname($($self_prefix_token)+ self $(, $arg_name: $arg_type)*) -> $retval {
+                        self.m.borrow_mut().$fname.call($($arg_name,)*)
                     }
                 )*
+            }
+
+            pub fn new() -> Mock {
+                Mock::new()
             }
         }
     )
@@ -84,25 +94,23 @@ macro_rules! mock_trait {
 
 pub trait FileWriter {
     //fn write_contents(&mut self, filename: &str, contents: &str);
-    fn check(&self, filename: &str);
+    fn check(&self, filename: &str, foo: i32);
 }
-
-macro_rules! match_args_name_and_type {
-    ($($arg_name:ident: $arg_type:ty),*) => ()
-}
-
-match_args_name_and_type!(foo: i32);
-match_args_name_and_type!(foo: i32, bar: &str);
 
 mock_trait!(
     FileWriter,
-    SomeMock,
-    fn check((&)(self, filename: &str)) -> ()
+    MockFileWriter,
+    fn check((&)self, filenane: &str, foo: i32) -> ()
 );
 
+
+pub trait Empty {}
+mock_trait!(Empty, EmptyMock);
+
 fn test() {
-    let mock = SomeMock::Mock::new();
-    mock.check("foo");
+    let empty_mocks = EmptyMock::new();
+    let mock = MockFileWriter::new();
+    mock.check("foo", 32);
 }
 
 #[cfg(test)]
