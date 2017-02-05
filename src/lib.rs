@@ -25,7 +25,17 @@ macro_rules! mock_method_type {
 
             #[allow(unused_variables)]
             pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
+                println!("{} called", stringify!($fname));
+                $(
+                    println!("\t{:?}", $arg_name);
+                )*
                 Default::default()
+            }
+        }
+
+        impl Drop for $fname {
+            fn drop(&mut self) {
+                println!("{} dropped", stringify!($fname));
             }
         }
     )
@@ -92,7 +102,17 @@ macro_rules! mock_trait {
     )
 }
 
-pub trait TestTrait {
+// Test traits
+// TODO: move to test module
+trait EmptyTrait {
+
+}
+
+trait SimpleTrait {
+    fn a_method(&mut self, a: i32, b: &str);
+}
+
+trait ComplexTrait {
     fn no_arg(&self);
     fn no_arg_mut(&mut self);
     fn one_arg(&self, a: i32);
@@ -102,53 +122,87 @@ pub trait TestTrait {
     fn three_args(&self, a: i32, b: &str, c: &mut Vec<i32>);
     fn three_args_mut(&mut self, a: i32, b: &str, c: &mut Vec<i32>);
 
-    fn no_arg_retval(&self) -> Vec<String>;
-    fn no_arg_mut_retval(&mut self) -> Vec<String>;
-    fn one_arg_retval(&self, a: i32) -> Vec<String>;
-    fn one_arg_mut_retval(&mut self, a: i32) -> Vec<String>;
-    fn two_args_retval(&self, a: i32, b: &str) -> Vec<String>;
-    fn two_args_mut_retval(&mut self, a: i32, b: &str) -> Vec<String>;
+    fn no_arg_retval(&self) -> u8;
+    fn no_arg_mut_retval(&mut self) -> i8;
+    fn one_arg_retval(&self, a: i32) -> u16;
+    fn one_arg_mut_retval(&mut self, a: i32) -> i16;
+    fn two_args_retval(&self, a: i32, b: &str) -> String;
+    fn two_args_mut_retval(&mut self, a: i32, b: &str) -> Vec<i32>;
     fn three_args_retval(&self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>;
     fn three_args_mut_retval(&mut self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>;
 }
 
-mock_trait!(
-    TestTrait,
-    MockOfTrait,
-    fn no_arg((&)self) -> (),
-    fn no_arg_mut((&mut)self) -> (),
-    fn one_arg((&)self, a: i32) -> (),
-    fn one_arg_mut((&mut)self, a: i32) -> (),
-    fn two_args((&)self, a: i32, b: &str) -> (),
-    fn two_args_mut((&mut)self, a: i32, b: &str) -> (),
-    fn three_args((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
-    fn three_args_mut((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
-    fn no_arg_retval((&)self) -> Vec<String>,
-    fn no_arg_mut_retval((&mut)self) -> Vec<String>,
-    fn one_arg_retval((&)self, a: i32) -> Vec<String>,
-    fn one_arg_mut_retval((&mut)self, a: i32) -> Vec<String>,
-    fn two_args_retval((&)self, a: i32, b: &str) -> Vec<String>,
-    fn two_args_mut_retval((&mut)self, a: i32, b: &str) -> Vec<String>,
-    fn three_args_retval((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>,
-    fn three_args_mut_retval((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>
-);
-
-
-pub trait Empty {}
-mock_trait!(Empty, EmptyMock);
-
-fn test() {
-    let empty_mocks = EmptyMock::new();
-    let mock = MockOfTrait::new();
-}
-
 #[cfg(test)]
 mod tests {
-    use self::super::*;
+    use SimpleTrait;
+    use ComplexTrait;
+
+    mock_trait!(EmptyTrait, EmptyMock);
+
+    mock_trait!(
+        SimpleTrait,
+        MockSimple,
+        fn a_method((&mut)self, a: i32, b: &str) -> ()
+    );
+
+    mock_trait!(
+        ComplexTrait,
+        MockComplex,
+        fn no_arg((&)self) -> (),
+        fn no_arg_mut((&mut)self) -> (),
+        fn one_arg((&)self, a: i32) -> (),
+        fn one_arg_mut((&mut)self, a: i32) -> (),
+        fn two_args((&)self, a: i32, b: &str) -> (),
+        fn two_args_mut((&mut)self, a: i32, b: &str) -> (),
+        fn three_args((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
+        fn three_args_mut((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> (),
+
+        fn no_arg_retval((&)self) -> u8,
+        fn no_arg_mut_retval((&mut)self) -> i8,
+        fn one_arg_retval((&)self, a: i32) -> u16,
+        fn one_arg_mut_retval((&mut)self, a: i32) -> i16,
+        fn two_args_retval((&)self, a: i32, b: &str) -> String,
+        fn two_args_mut_retval((&mut)self, a: i32, b: &str) -> Vec<i32>,
+        fn three_args_retval((&)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>,
+        fn three_args_mut_retval((&mut)self, a: i32, b: &str, c: &mut Vec<i32>) -> Vec<String>
+    );
 
     #[test]
-    fn it_works() {
-        super::test();
+    fn mocking_empty_trait() {
+        EmptyMock::new();
+    }
+
+    #[test]
+    fn mocking_simple_trait() {
+        let mut mock = MockSimple::new();
+        mock.a_method(42, "hello");
+    }
+
+    #[test]
+    fn mocking_trait_with_all_method_variances() {
+        let mut empty_vec = vec![];
+        let mut vec_with_one_elem = vec![1];
+        let mut vec_with_multiple_elems = vec![2, 3, 4];
+        let mut another_vec = vec![5, 6, 7];
+
+        let mut mock = MockComplex::new();
+        mock.no_arg();
+        mock.no_arg_mut();
+        mock.one_arg(1);
+        mock.one_arg_mut(2);
+        mock.two_args(3, "donald");
+        mock.two_args_mut(4, "whyte");
+        mock.three_args(5, "is", &mut empty_vec);
+        mock.three_args_mut(6, "alive", &mut vec_with_one_elem);
+
+        println!("{:?}", mock.no_arg_retval());
+        println!("{:?}", mock.no_arg_mut_retval());
+        println!("{:?}", mock.one_arg_retval(7));
+        println!("{:?}", mock.one_arg_mut_retval(8));
+        println!("{:?}", mock.two_args_retval(9, "my"));
+        println!("{:?}", mock.two_args_mut_retval(10, "name"));
+        println!("{:?}", mock.three_args_retval(11, "is", &mut vec_with_multiple_elems));
+        println!("{:?}", mock.three_args_mut_retval(12, "donald", &mut another_vec));
     }
 
 }
