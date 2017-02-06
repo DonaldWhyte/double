@@ -16,6 +16,14 @@ How to represent matchers? Some ideas:
 
 */
 
+/*
+
+Constraints:
+    - arguments have to implement Copy trait
+    - return values have to implement Default trait
+
+*/
+
 enum CallCount {
     Never,
     Once,
@@ -25,60 +33,92 @@ enum CallCount {
     Between(u32, u32)
 }
 
+struct ExpectationError {
+    // TODO
+}
+
+fn build_error_string(errors: &Vec<ExpectationError>) -> String {
+    String::new()
+}
+
 macro_rules! mock_method_type {
     ( $method_name:ident, $retval:ty $( , $arg_name:ident: $arg_type:ty )* ) => (
         pub mod $method_name {
             use std::vec::Vec;
             use CallCount;
+            use ExpectationError;
+            use build_error_string;
 
             type ReturnValue = $retval;
 
             struct Expectation {
-                count: CallCount
+                count: CallCount,
+                return_value: ReturnValue
                 $(, $arg_name: fn($arg_type) -> bool)*
             }
 
             impl Expectation {
-                pub fn new(count: CallCount $(, $arg_name: fn($arg_type) -> bool)*)
+                pub fn new(count: CallCount, return_value: ReturnValue
+                           $(, $arg_name: fn($arg_type) -> bool)*)
                     -> Expectation
                 {
                     Expectation {
-                        count: count
+                        count: count,
+                        return_value: return_value
                         $(, $arg_name: $arg_name)*
                     }
                 }
             }
 
+            struct CallInstance {
+                //$($arg_name: TODO!($arg_type)),*
+                // TODO
+            }
+
             pub struct Method {
-                expectations: Vec<Expectation>
+                expectations: Vec<Expectation>,
+                calls: Vec<CallInstance>
             }
 
             impl Method {
                 pub fn new() -> Method {
                     Method {
-                        expectations: vec![]
+                        expectations: vec![],
+                        calls: vec![]
                     }
                 }
 
-                #[allow(unused_variables)]
                 pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
                     println!("{} called", stringify!($method_name));
                     $(
                         println!("\t{:?}", $arg_name);
                     )*
+                    let call = CallInstance {
+                        // TODO
+                    };
+                    let return_value = self.return_value_based_on_call(&call);
+                    self.calls.push(call);
+                    return_value
+                }
+
+                fn return_value_based_on_call(&self, call: &CallInstance)
+                    -> ReturnValue
+                {
                     Default::default()
                 }
 
-                #[allow(unused_variables)]
-                pub fn expect(&mut self, call_count: CallCount
+                pub fn expect(&mut self,
+                              call_count: CallCount,
+                              return_value: ReturnValue
                               $(, $arg_name: fn($arg_type) -> bool)*)
                 {
                     self.expectations.push(
-                        Expectation::new(call_count $(, $arg_name)*)
+                        Expectation::new(
+                            call_count, return_value $(, $arg_name)*)
                     );
                 }
 
-                pub fn check_and_clear_expectations(&mut self) {
+                pub fn check_expectations_then_clear(&mut self) {
                     // TODO: have unordered check by default
                     // TODO: checked ordered if some flag is set
                 }
@@ -87,7 +127,7 @@ macro_rules! mock_method_type {
             impl Drop for Method {
                 fn drop(&mut self) {
                     println!("{} dropped", stringify!($method_name));
-                    self.check_and_clear_expectations();
+                    self.check_expectations_then_clear();
                 }
             }
         }
