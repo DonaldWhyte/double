@@ -26,8 +26,8 @@ enum CallCount {
 }
 
 macro_rules! mock_method_type {
-    ( $fname:ident, $retval:ty $( , $arg_name:ident: $arg_type:ty )* ) => (
-        pub mod $fname {
+    ( $method_name:ident, $retval:ty $( , $arg_name:ident: $arg_type:ty )* ) => (
+        pub mod $method_name {
             use std::vec::Vec;
             use CallCount;
 
@@ -62,7 +62,7 @@ macro_rules! mock_method_type {
 
                 #[allow(unused_variables)]
                 pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
-                    println!("{} called", stringify!($fname));
+                    println!("{} called", stringify!($method_name));
                     $(
                         println!("\t{:?}", $arg_name);
                     )*
@@ -86,7 +86,7 @@ macro_rules! mock_method_type {
 
             impl Drop for Method {
                 fn drop(&mut self) {
-                    println!("{} dropped", stringify!($fname));
+                    println!("{} dropped", stringify!($method_name));
                     self.check_and_clear_expectations();
                 }
             }
@@ -98,7 +98,7 @@ macro_rules! mock_trait {
     (
         $trait_name:ident,
         $mock_name:ident
-        $(, fn $fname:ident(
+        $(, fn $method_name:ident(
             ($($self_prefix_token:tt)+) self $( , $arg_name:ident: $arg_type:ty )*
           ) -> $retval:ty
         )*
@@ -112,18 +112,18 @@ macro_rules! mock_trait {
             mod method_types {
                 $(
                     mock_method_type!(
-                        $fname, $retval $(, $arg_name: $arg_type)*);
+                        $method_name, $retval $(, $arg_name: $arg_type)*);
                 )*
             }
 
             struct Methods {
-                $(pub $fname: method_types::$fname::Method),*
+                $(pub $method_name: method_types::$method_name::Method),*
             }
 
             impl Methods {
                 pub fn new() -> Methods {
                     Methods {
-                        $($fname: method_types::$fname::Method::new()),*
+                        $($method_name: method_types::$method_name::Method::new()),*
                     }
                 }
             }
@@ -142,8 +142,10 @@ macro_rules! mock_trait {
 
             impl $trait_name for Mock {
                 $(
-                    fn $fname($($self_prefix_token)+ self $(, $arg_name: $arg_type)*) -> $retval {
-                        self.m.borrow_mut().$fname.call($($arg_name,)*)
+                    fn $method_name($($self_prefix_token)+ self
+                                    $(, $arg_name: $arg_type)*) -> $retval
+                    {
+                        self.m.borrow_mut().$method_name.call($($arg_name,)*)
                     }
                 )*
             }
