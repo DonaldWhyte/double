@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! decay {
     (str) => (String);
     (& str) => (String);

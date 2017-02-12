@@ -1,2 +1,2 @@
 pub mod mock;
-mod decay;
+#[macro_use] mod decay;

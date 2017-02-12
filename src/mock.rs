@@ -25,6 +25,9 @@ Constraints:
 */
 
 
+decay!(i32);
+
+
 enum CallCount {
     Never,
     Once,
@@ -72,7 +75,7 @@ macro_rules! mock_method_type {
             }
 
             struct CallInstance {
-                // $($arg_name: decay_type!($arg_type)),*
+                //$($arg_name: decay!($arg_type)),*
             }
 
             pub struct Method {
