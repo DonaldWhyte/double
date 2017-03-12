@@ -24,11 +24,7 @@ Constraints:
 
 */
 
-
-decay!(i32);
-
-
-enum CallCount {
+pub enum CallCount {
     Never,
     Once,
     Exactly(u32),
@@ -58,7 +54,7 @@ macro_rules! mock_method_type {
             struct Expectation {
                 count: CallCount,
                 return_value: ReturnValue
-                $(, $arg_name: fn($arg_type) -> bool)*
+                //$(, $arg_name: fn($arg_type) -> bool)*
             }
 
             impl Expectation {
@@ -69,13 +65,34 @@ macro_rules! mock_method_type {
                     Expectation {
                         count: count,
                         return_value: return_value
-                        $(, $arg_name: $arg_name)*
+                        //$(, $arg_name: $arg_name)*
                     }
                 }
             }
 
+            // --------------------------------------------------------------------
+
+            pub trait Decay {
+                type Type;
+            }
+
+            impl<T> Decay for T {
+                default type Type = T;
+            }
+
+            impl<'a, T> Decay for &'a T {
+                type Type = <T as Decay>::Type;
+            }
+
+            impl<'a, T> Decay for &'a mut T {
+                type Type = <T as Decay>::Type;
+            }
+
+            // --------------------------------------------------------------------
+
             struct CallInstance {
-                //$($arg_name: decay!($arg_type)),*
+                //$($arg_name: decay_type!($arg_type)),*
+                //$($arg_name: <$arg_type as Decay>::Type),*
             }
 
             pub struct Method {
@@ -91,6 +108,7 @@ macro_rules! mock_method_type {
                     }
                 }
 
+                #[allow(unused_variables)]
                 pub fn call(&mut self $(, $arg_name: $arg_type)*) -> $retval {
                     println!("{} called", stringify!($method_name));
                     $(
@@ -104,6 +122,7 @@ macro_rules! mock_method_type {
                     return_value
                 }
 
+                #[allow(unused_variables)]
                 fn return_value_based_on_call(&self, call: &CallInstance)
                     -> ReturnValue
                 {
@@ -198,6 +217,74 @@ macro_rules! mock_trait {
         }
     )
 }
+
+pub trait SimpleTrait {
+    fn a_method(&mut self, a: i32, b: &str);
+}
+
+mock_trait!(
+    super::SimpleTrait,
+    MockSimple,
+    fn a_method((&mut)self, a: i32, b: &str) -> ()
+);
+
+
+// --------------------------------------------------------------------
+
+pub trait Decay {
+    type Type;
+}
+
+impl<T> Decay for T {
+    default type Type = T;
+}
+
+impl<'a, T> Decay for &'a T {
+    type Type = <T as Decay>::Type;
+}
+
+impl<'a, T> Decay for &'a mut T {
+    type Type = <T as Decay>::Type;
+}
+
+macro_rules! decay_type2 {
+    (&&'static mut str) => (String);
+    (&&'static str) => (String);
+    (&'static mut str) => (String);
+    (&'static str) => (String);
+    (&& mut str) => (String);
+    (&& str) => (String);
+    (& mut str) => (String);
+    (& str) => (String);
+    (str) => (String);
+    //($($typename:tt)*) => (Decay::<$($typename)*>::Type);
+    ($($typename:tt)*) => (<$($typename)* as Decay>::Type);
+}
+
+fn decay_test() {
+    use std::any::TypeId;
+
+    struct Foo {
+        a: i32,
+        b: String
+    }
+
+    assert_eq!(
+        TypeId::of::<i32>(),
+        TypeId::of::<decay_type2!(i32)>());
+    assert_eq!(
+        TypeId::of::<i32>(),
+        TypeId::of::<decay_type2!(&i32)>());
+    assert_eq!(
+        TypeId::of::<String>(),
+        TypeId::of::<decay_type2!(&str)>());
+    assert_eq!(
+        TypeId::of::<Foo>(),
+        TypeId::of::<decay_type2!(&mut Foo)>());
+}
+
+
+// --------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -312,4 +399,11 @@ mod tests {
         println!("{:?}", mock.three_args_mut_retval(12, "donald", &mut another_vec));
     }
 
+    use std::any::TypeId;
+
+    use super::decay_test;
+    #[test]
+    fn decay_test_wrapper() {
+        decay_test();
+    }
 }

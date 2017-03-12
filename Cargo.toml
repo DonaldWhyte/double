@@ -5,3 +5,4 @@ authors = ["Donald Whyte <donaldwhyte0@gmail.com>"]
 
 [dependencies]
 spectral = "0.6.0"
+decay_type = "0.1.1"
