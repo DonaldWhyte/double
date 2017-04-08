@@ -52,4 +52,23 @@ fn main() {
     assert!(mock.greet.called_with("Fido"));
     assert!(mock.greet.called_with("Spot"));
     assert!(mock.greet.called_with("Princess"));
+
+    assert!(mock.greet.has_calls(vec!("Fido", "Spot")));
+    assert!(!mock.greet.has_calls(vec!("Fido", "Spot", "not_in_calls")));
+
+    assert!(mock.greet.has_calls_in_order(vec!("Fido", "Spot")));
+    assert!(!mock.greet.has_calls_in_order(vec!("Spot", "Fido")));
+
+    assert!(!mock.greet.has_calls_exactly(vec!("Fido", "Spot")));
+    assert!(mock.greet.has_calls_exactly(vec!("Princess", "Fido", "Spot")));
+    assert!(!mock.greet.has_calls_exactly(
+        vec!("Princess", "Fido", "Spot", "not_in_calls")));
+
+    assert!(!mock.greet.has_calls_exactly_in_order(vec!("Fido", "Spot")));
+    assert!(!mock.greet.has_calls_exactly_in_order(
+        vec!("Princess", "Fido", "Spot")));
+    assert!(mock.greet.has_calls_exactly_in_order(
+        vec!("Fido", "Spot", "Princess")));
+    assert!(!mock.greet.has_calls_exactly_in_order(
+        vec!("Fido", "Spot", "Princess", "not_in_calls")));
 }

@@ -49,7 +49,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<&str, _>::new("return value");
     /// assert_eq!(mock.call("something"), "return value");
@@ -85,7 +85,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<&str, &str>::new("original value");
     /// mock.return_value("new value");
@@ -104,7 +104,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// fn add_two(x: i64) -> i64 {
     ///     x + 2
@@ -120,7 +120,7 @@ impl<C, R> Mock<C, R>
     /// For functions with multiple arguments, use a tuple:
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// fn add((x, y, z): (i64, i64, i64)) -> i64 {
     ///     x + y + z
@@ -145,7 +145,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<i64, i64>::new(10);
     /// let add_two = |x| x + 2;
@@ -158,7 +158,7 @@ impl<C, R> Mock<C, R>
     /// For functions with multiple arguments, use a tuple:
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<(i64, i64, i64), i64>::default();
     /// let add = |(x, y, z)| x + y + z;
@@ -177,7 +177,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<i64, ()>::default();
     ///
@@ -196,7 +196,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<i64, i64>::new(0);
     ///
@@ -215,7 +215,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<&str, &str>::new("");
     ///
@@ -234,7 +234,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<&str, &str>::default();
     ///
@@ -267,7 +267,7 @@ impl<C, R> Default for Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<i64, i64>::default();
     /// assert_eq!(mock.call(10), 0);
@@ -284,7 +284,7 @@ impl<C, R> Default for Mock<C, R>
 }
 
 impl<C, R> Mock<C, R>
-    where C: Clone + PartialEq,
+    where C: Clone + Debug + PartialEq,
           R: Clone
 {
     /// Returns true if the specified argument has been used for `Mock::call`.
@@ -292,7 +292,7 @@ impl<C, R> Mock<C, R>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<&str, ()>::new(());
     /// mock.call("foo");
@@ -305,6 +305,180 @@ impl<C, R> Mock<C, R>
     pub fn called_with<T: Into<C>>(&self, args: T) -> bool {
         self.calls.borrow().contains(&args.into())
     }
+
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `calls`. The `calls` can be made in any order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, ()>::new(());
+    /// mock.call("foo");
+    /// mock.call("bar");
+    ///
+    /// let expected_calls1 = vec!("foo", "bar");
+    /// assert(mock.has_calls(expected_calls1));
+    /// let expected_calls2 = vec!("bar", "foo");
+    /// assert(mock.has_calls(expected_calls2));
+    /// let expected_calls3 = vec!("foo");
+    /// assert(mock.has_calls(expected_calls3));
+    /// let expected_calls4 = vec!("not_in_calls");
+    /// assert(!mock.has_calls(expected_calls4));
+    /// let expected_calls5 = vec!("foo", not_in_calls");
+    /// assert(!mock.has_calls(expected_calls5));
+    /// ```
+    pub fn has_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
+        let num_expected = expected_calls.len();
+        let matches = self.match_calls(expected_calls);
+        matches.len() == num_expected
+    }
+
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `calls`. The `calls` must be made in the order they are specified in
+    /// the vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, ()>::new(());
+    /// mock.call("foo");
+    /// mock.call("bar");
+    ///
+    /// let expected_calls1 = vec!("foo", "bar");
+    /// assert(mock.has_calls_in_order(expected_calls1));
+    /// let expected_calls2 = vec!("bar", "foo");
+    /// assert(!mock.has_calls_in_order(expected_calls2));
+    /// let expected_calls3 = vec!("foo");
+    /// assert(mock.has_calls(expected_calls3));
+    /// let expected_calls4 = vec!("bar");
+    /// assert(mock.has_calls(expected_calls4));
+    /// ```
+    pub fn has_calls_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
+        let num_expected = expected_calls.len();
+        let matches = self.match_calls(expected_calls);
+        if matches.len() != num_expected {
+            false
+        } else {
+            let match_indices: Vec<usize> = matches
+                .iter()
+                .map(|r| r.1.clone())
+                .collect();
+            for window in match_indices.as_slice().windows(2) {
+                if window[0] >= window[1] {
+                    return false
+                }
+            }
+            true
+        }
+    }
+
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `calls` and it has not been called any other times. The `calls` can be
+    /// made in any order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, ()>::new(());
+    /// mock.call("foo");
+    /// mock.call("bar");
+    ///
+    /// let expected_calls1 = vec!("foo", "bar");
+    /// assert(mock.has_calls_exactly(expected_calls1));
+    /// let expected_calls2 = vec!("bar", "foo");
+    /// assert(mock.has_calls_exactly(expected_calls2));
+    /// let expected_calls3 = vec!("foo");
+    /// assert(!mock.has_calls_exactly(expected_calls3));
+    /// let expected_calls4 = vec!("bar");
+    /// assert(!mock.has_calls_exactly(expected_calls4));
+    pub fn has_calls_exactly<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
+        let num_expected = expected_calls.len();
+        let has_calls = self.has_calls(expected_calls);
+
+        let actual_num_calls = self.calls.borrow().len();
+        if actual_num_calls > num_expected {
+            println!(
+                "Mock was called {:?} times, not {:?}",
+                actual_num_calls,
+                num_expected);
+            return false
+        }
+
+        has_calls
+    }
+
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `calls` and it has not been called any other times. The `calls` must be
+    /// made in the order they are specified in the vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, ()>::new(());
+    /// mock.call("foo");
+    /// mock.call("bar");
+    ///
+    /// let expected_calls1 = vec!("foo", "bar");
+    /// assert(mock.has_calls_exactly_in_order(expected_calls1));
+    /// let expected_calls2 = vec!("bar", "foo");
+    /// assert(!mock.has_calls_exactly_in_order(expected_calls2));
+    /// let expected_calls3 = vec!("foo");
+    /// assert(!mock.has_calls_exactly_in_order(expected_calls3));
+    /// let expected_calls4 = vec!("bar");
+    /// assert(!mock.has_calls_exactly_in_order(expected_calls4));
+    pub fn has_calls_exactly_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
+        let num_expected = expected_calls.len();
+        let has_calls = self.has_calls_in_order(expected_calls);
+
+        let actual_num_calls = self.calls.borrow().len();
+        if actual_num_calls > num_expected {
+            println!(
+                "Mock was called {:?} times, not {:?}",
+                actual_num_calls,
+                num_expected);
+            return false
+        }
+
+        has_calls
+    }
+
+    fn match_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> Vec<(C, usize)> {
+        let expected_calls_c: Vec<C> = expected_calls
+            .into_iter()
+            .map(|r| r.into())
+            .collect();
+
+        let mut matches: Vec<(C, usize)> = vec!();
+        for call in self.calls.borrow().iter() {
+            match expected_calls_c.iter().position(|r| call == r)
+            {
+                Some(index) => {
+                    matches.push((call.clone(), index));
+                },
+                None => {
+                }
+            }
+        }
+
+        {
+            let matches_c: Vec<C> = matches.iter().map(|r| r.0.clone()).collect();
+            let missing = expected_calls_c.iter().filter(
+                |call| !matches_c.contains(call));
+            for missing_call in missing {
+                println!("Expected call missing: {:?}", missing_call);
+            }
+        }
+
+        matches
+    }
 }
 
 impl<C, S> Mock<C, Option<S>>
@@ -316,7 +490,7 @@ impl<C, S> Mock<C, Option<S>>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<(), Option<i64>>::new(None);
     /// mock.return_some(10);
@@ -332,7 +506,7 @@ impl<C, S> Mock<C, Option<S>>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<(), Option<i64>>::new(Some(42));
     /// mock.return_none();
@@ -354,7 +528,7 @@ impl<C, O, E> Mock<C, Result<O, E>>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<(), Result<&str, &str>>::new(Err("oh no"));
     /// mock.return_ok("success");
@@ -370,7 +544,7 @@ impl<C, O, E> Mock<C, Result<O, E>>
     /// # Examples
     ///
     /// ```
-    /// use pseudo::Mock;
+    /// use double::Mock;
     ///
     /// let mock = Mock::<(), Result<&str, &str>>::new(Ok("success"));
     /// mock.return_err("oh no");
