@@ -2,5 +2,15 @@
 name = "double"
 version = "0.1.0"
 authors = ["Donald Whyte <donsoft@donsoft.io>"]
+repository = "https://github.com/DonaldWhyte/double"
+homepage = "https://github.com/DonaldWhyte/double"
+documentation = "https://docs.rs/double"
+license = "MIT"
+readme = "README.md"
+keywords = [ "mock", "test", "testing", "double", "spy", "stub", "unit", "matcher", "matchers" ]
+categories= [
+    "development-tools::testing"
+]
+description="Full-featured mocking library in Rust, including rich failure messages and argument matchers"
 
 [dependencies]
