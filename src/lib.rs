@@ -1,6 +1,8 @@
-use std::fmt;
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::hash::Hash;
 use std::rc::Rc;
 
 type OptionalRef<T> = Rc<RefCell<Option<T>>>;
@@ -14,37 +16,47 @@ type OptionalRef<T> = Rc<RefCell<Option<T>>>;
 /// `Clone`.
 #[derive(Clone)]
 pub struct Mock<C, R>
-    where C: Clone,
+    where C: Clone + Eq + Hash,
           R: Clone
 {
-    return_value: Rc<RefCell<R>>,
-    mock_fn: OptionalRef<fn(C) -> R>,
-    mock_closure: OptionalRef<Box<Fn(C) -> R>>,
-    calls: Rc<RefCell<Vec<C>>>,
+    default_return_value: Rc<RefCell<R>>,
+    default_fn: OptionalRef<fn(C) -> R>,
+    default_closure: OptionalRef<Box<Fn(C) -> R>>,
+    return_values: Rc<RefCell<HashMap<C, R>>>,
+    fns: Rc<RefCell<HashMap<C, fn(C) -> R>>>,
+    closures: Rc<RefCell<HashMap<C, Box<Fn(C) -> R>>>>,
+    calls: Rc<RefCell<Vec<C>>>
 }
 
 impl<C, R> Mock<C, R>
-    where C: Clone,
+    where C: Clone + Eq + Hash,
           R: Clone
 {
     /// Creates a new `Mock` that will return `return_value`.
     pub fn new<T: Into<R>>(return_value: T) -> Self {
         Mock {
-            return_value: Rc::new(RefCell::new(return_value.into())),
-            mock_fn: Rc::new(RefCell::new(None)),
-            mock_closure: Rc::new(RefCell::new(None)),
+            default_return_value: Rc::new(RefCell::new(return_value.into())),
+            default_fn: Rc::new(RefCell::new(None)),
+            default_closure: Rc::new(RefCell::new(None)),
+            return_values: Rc::new(RefCell::new(HashMap::new())),
+            fns: Rc::new(RefCell::new(HashMap::new())),
+            closures: Rc::new(RefCell::new(HashMap::new())),
             calls: Rc::new(RefCell::new(vec![])),
         }
     }
 
     /// Use the `Mock` to return a value, keeping track of the arguments used.
     ///
-    /// Depending on what has most recently been called, this will return:
-    /// - the return value specified at construction time
-    /// - the return value specified via `Mock::return_value` or a derivative,
-    /// such as `Mock::return_some`
-    /// - the output of the function set via `Mock::use_fn` with the current arguments
-    /// - the output of the closure set via `Mock::use_closure` with the current arguments
+    /// If specific behaviour has been configured for a specific set of
+    /// arguments, this will return (in this order of precedence):
+    ///     1. the return value returned by the configured closure
+    ///     2. the return value returned by the configured function
+    ///     3. the configured return value
+    /// If no specific behaviour has been configured for the input argument set,
+    /// the mock falls back to default behaviour, in this order of precedence:
+    ///     1. the return value returned by the default closure (if configured)
+    ///     2. the return value returned by the default function (if configured)
+    ///     3. the default return value (always configured)
     ///
     /// # Examples
     ///
@@ -65,22 +77,35 @@ impl<C, R> Mock<C, R>
     ///
     /// mock.use_fn(str::trim);
     /// assert_eq!(mock.call("  test  "), "test");
+    ///
+    /// mock.return_value_for("  banana", "tasty");
+    /// assert_eq!(mock.call("  banana"), "tasty");
+    ///
+    /// mock.use_fn_for("  banana  ", str::trim);
+    /// assert_eq!(mock.call("  banana  "), "banana");
+    ///
+    /// mock.use_closure_for("  banana  ", Box::new(|x| x.trim_left()));
+    /// assert_eq!(mock.call("  banana  "), "banana  ");
     /// ```
     pub fn call(&self, args: C) -> R {
         self.calls.borrow_mut().push(args.clone());
 
-        if let Some(ref mock_fn) = *self.mock_fn.borrow() {
-            return mock_fn(args);
+        if let Some(ref closure) = self.closures.borrow().get(&args) {
+            return closure(args)
+        } else if  let Some(ref function) = self.fns.borrow().get(&args) {
+            return function(args)
+        } else if let Some(return_value) = self.return_values.borrow().get(&args) {
+            return return_value.clone()
+        } else if let Some(ref default_fn) = *self.default_fn.borrow() {
+            return default_fn(args);
+        } else if let Some(ref default_closure) = *self.default_closure.borrow() {
+            return default_closure(args);
+        } else {
+            self.default_return_value.borrow().clone()
         }
-
-        if let Some(ref mock_closure) = *self.mock_closure.borrow() {
-            return mock_closure(args);
-        }
-
-        self.return_value.borrow().clone()
     }
 
-    /// Override the initial return value.
+    /// Override the default return value.
     ///
     /// # Examples
     ///
@@ -93,7 +118,27 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call("something"), "new value");
     /// ```
     pub fn return_value<T: Into<R>>(&self, return_value: T) {
-        *self.return_value.borrow_mut() = return_value.into()
+        *self.default_return_value.borrow_mut() = return_value.into();
+    }
+
+    /// Override the return value for a specific set of call arguments.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, &str>::new("original value");
+    /// mock.return_value("new value");
+    /// mock.return_value_for("banana", "tasty");
+    ///
+    /// assert_eq!(mock.call("something"), "new value");
+    /// assert_eq!(mock.call("banana"), "tasty");
+    /// ```
+    pub fn return_value_for<S: Into<C>, T: Into<R>>(&self, args: S, return_value: T) {
+        self.return_values.borrow_mut().insert(
+            args.into(),
+            return_value.into());
     }
 
     /// Specify a function to determine the `Mock`'s return value based on
@@ -132,9 +177,52 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 1, 1)), 3);
     /// assert_eq!(mock.call((1, 2, 3,)), 6);
     /// ```
-    pub fn use_fn(&self, mock_fn: fn(C) -> R) {
-        *self.mock_closure.borrow_mut() = None;
-        *self.mock_fn.borrow_mut() = Some(mock_fn)
+    pub fn use_fn(&self, default_fn: fn(C) -> R) {
+        *self.default_closure.borrow_mut() = None;
+        *self.default_fn.borrow_mut() = Some(default_fn)
+    }
+
+    /// Specify a function to determine the `Mock`'s return value based on
+    /// the arguments provided to `Mock::call`. This function will only be
+    /// invoked if the arguments match the specified `args`.
+    ///
+    /// Arguments of `Mock::call` are still tracked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// fn add_two(x: i64) -> i64 {
+    ///     x + 2
+    /// }
+    ///
+    /// let mock = Mock::<i64, i64>::new(10);
+    /// mock.return_value(42);
+    /// mock.use_fn_for(5, add_two);
+    ///
+    /// assert_eq!(mock.call(1), 42);  // uses default value
+    /// assert_eq!(mock.call(5), 7);   // uses function since args match
+    /// ```
+    ///
+    /// For functions with multiple arguments, use a tuple:
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// fn add((x, y, z): (i64, i64, i64)) -> i64 {
+    ///     x + y + z
+    /// }
+    ///
+    /// let mock = Mock::<(i64, i64, i64), i64>::default();
+    /// mock.return_value(42);
+    /// mock.use_fn_for((1, 2, 3), add);
+    ///
+    /// assert_eq!(mock.call((1, 1, 1)), 42);
+    /// assert_eq!(mock.call((1, 2, 3)), 6);
+    /// ```
+    pub fn use_fn_for<T: Into<C>>(&self, args: T, function: fn(C) -> R) {
+        self.fns.borrow_mut().insert(args.into(), function);
     }
 
     /// Specify a closure to determine the `Mock`'s return value based on
@@ -167,9 +255,46 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 1, 1)), 3);
     /// assert_eq!(mock.call((1, 2, 3,)), 6);
     /// ```
-    pub fn use_closure(&self, mock_fn: Box<Fn(C) -> R>) {
-        *self.mock_fn.borrow_mut() = None;
-        *self.mock_closure.borrow_mut() = Some(mock_fn)
+    pub fn use_closure(&self, default_fn: Box<Fn(C) -> R>) {
+        *self.default_fn.borrow_mut() = None;
+        *self.default_closure.borrow_mut() = Some(default_fn)
+    }
+
+    /// Specify a closure to determine the `Mock`'s return value based on
+    /// the arguments provided to `Mock::call`. This closure will only be
+    /// invoked if the arguments match the specified `args`.
+    ///
+    /// Arguments of `Mock::call` are still tracked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<i64, i64>::new(10);
+    /// let add_two = |x| x + 2;
+    /// mock.return_value(42);
+    /// mock.use_closure_for(10, Box::new(add_two));
+    ///
+    /// assert_eq!(mock.call(1), 42);
+    /// assert_eq!(mock.call(10), 12);
+    /// ```
+    ///
+    /// For functions with multiple arguments, use a tuple:
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i64, i64, i64), i64>::default();
+    /// let add = |(x, y, z)| x + y + z;
+    /// mock.return_value(42);
+    /// mock.use_closure_for((1, 2, 3), Box::new(add));
+    ///
+    /// assert_eq!(mock.call((1, 1, 1)), 42);
+    /// assert_eq!(mock.call((1, 2, 3)), 6);
+    /// ```
+    pub fn use_closure_for<T: Into<C>>(&self, args: T, function: Box<Fn(C) -> R>) {
+        self.closures.borrow_mut().insert(args.into(), function);
     }
 
     /// Returns true if `Mock::call` has been called.
@@ -259,7 +384,7 @@ impl<C, R> Mock<C, R>
 }
 
 impl<C, R> Default for Mock<C, R>
-    where C: Clone,
+    where C: Clone + Eq + Hash,
           R: Clone + Default
 {
     /// Use `R::default()` as the initial return value.
@@ -284,7 +409,7 @@ impl<C, R> Default for Mock<C, R>
 }
 
 impl<C, R> Mock<C, R>
-    where C: Clone + Debug + PartialEq,
+    where C: Clone + Debug + Eq + Hash + PartialEq,
           R: Clone
 {
     /// Returns true if the specified argument has been used for `Mock::call`.
@@ -319,15 +444,15 @@ impl<C, R> Mock<C, R>
     /// mock.call("bar");
     ///
     /// let expected_calls1 = vec!("foo", "bar");
-    /// assert(mock.has_calls(expected_calls1));
+    /// assert!(mock.has_calls(expected_calls1));
     /// let expected_calls2 = vec!("bar", "foo");
-    /// assert(mock.has_calls(expected_calls2));
+    /// assert!(mock.has_calls(expected_calls2));
     /// let expected_calls3 = vec!("foo");
-    /// assert(mock.has_calls(expected_calls3));
+    /// assert!(mock.has_calls(expected_calls3));
     /// let expected_calls4 = vec!("not_in_calls");
-    /// assert(!mock.has_calls(expected_calls4));
-    /// let expected_calls5 = vec!("foo", not_in_calls");
-    /// assert(!mock.has_calls(expected_calls5));
+    /// assert!(!mock.has_calls(expected_calls4));
+    /// let expected_calls5 = vec!("foo", "not_in_calls");
+    /// assert!(!mock.has_calls(expected_calls5));
     /// ```
     pub fn has_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
         let num_expected = expected_calls.len();
@@ -349,13 +474,13 @@ impl<C, R> Mock<C, R>
     /// mock.call("bar");
     ///
     /// let expected_calls1 = vec!("foo", "bar");
-    /// assert(mock.has_calls_in_order(expected_calls1));
+    /// assert!(mock.has_calls_in_order(expected_calls1));
     /// let expected_calls2 = vec!("bar", "foo");
-    /// assert(!mock.has_calls_in_order(expected_calls2));
+    /// assert!(!mock.has_calls_in_order(expected_calls2));
     /// let expected_calls3 = vec!("foo");
-    /// assert(mock.has_calls(expected_calls3));
+    /// assert!(mock.has_calls(expected_calls3));
     /// let expected_calls4 = vec!("bar");
-    /// assert(mock.has_calls(expected_calls4));
+    /// assert!(mock.has_calls(expected_calls4));
     /// ```
     pub fn has_calls_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
         let num_expected = expected_calls.len();
@@ -390,13 +515,13 @@ impl<C, R> Mock<C, R>
     /// mock.call("bar");
     ///
     /// let expected_calls1 = vec!("foo", "bar");
-    /// assert(mock.has_calls_exactly(expected_calls1));
+    /// assert!(mock.has_calls_exactly(expected_calls1));
     /// let expected_calls2 = vec!("bar", "foo");
-    /// assert(mock.has_calls_exactly(expected_calls2));
+    /// assert!(mock.has_calls_exactly(expected_calls2));
     /// let expected_calls3 = vec!("foo");
-    /// assert(!mock.has_calls_exactly(expected_calls3));
+    /// assert!(!mock.has_calls_exactly(expected_calls3));
     /// let expected_calls4 = vec!("bar");
-    /// assert(!mock.has_calls_exactly(expected_calls4));
+    /// assert!(!mock.has_calls_exactly(expected_calls4));
     pub fn has_calls_exactly<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
         let num_expected = expected_calls.len();
         let has_calls = self.has_calls(expected_calls);
@@ -427,13 +552,13 @@ impl<C, R> Mock<C, R>
     /// mock.call("bar");
     ///
     /// let expected_calls1 = vec!("foo", "bar");
-    /// assert(mock.has_calls_exactly_in_order(expected_calls1));
+    /// assert!(mock.has_calls_exactly_in_order(expected_calls1));
     /// let expected_calls2 = vec!("bar", "foo");
-    /// assert(!mock.has_calls_exactly_in_order(expected_calls2));
+    /// assert!(!mock.has_calls_exactly_in_order(expected_calls2));
     /// let expected_calls3 = vec!("foo");
-    /// assert(!mock.has_calls_exactly_in_order(expected_calls3));
+    /// assert!(!mock.has_calls_exactly_in_order(expected_calls3));
     /// let expected_calls4 = vec!("bar");
-    /// assert(!mock.has_calls_exactly_in_order(expected_calls4));
+    /// assert!(!mock.has_calls_exactly_in_order(expected_calls4));
     pub fn has_calls_exactly_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
         let num_expected = expected_calls.len();
         let has_calls = self.has_calls_in_order(expected_calls);
@@ -482,7 +607,7 @@ impl<C, R> Mock<C, R>
 }
 
 impl<C, S> Mock<C, Option<S>>
-    where C: Clone,
+    where C: Clone + Eq + Hash,
           S: Clone
 {
     /// Return `Some(return_value)` from `Mock::call`.
@@ -519,7 +644,7 @@ impl<C, S> Mock<C, Option<S>>
 }
 
 impl<C, O, E> Mock<C, Result<O, E>>
-    where C: Clone,
+    where C: Clone + Eq + Hash,
           O: Clone,
           E: Clone
 {
@@ -557,12 +682,13 @@ impl<C, O, E> Mock<C, Result<O, E>>
 }
 
 impl<C, R> Debug for Mock<C, R>
-    where C: Clone + Debug,
+    where C: Clone + Debug + Eq + Hash,
           R: Clone + Debug
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Mock")
-            .field("return_value", &self.return_value)
+            .field("default_return_value", &self.default_return_value)
+            .field("return_values", &self.return_values)
             .field("calls", &self.calls)
             .finish()
     }
