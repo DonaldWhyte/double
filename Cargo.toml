@@ -7,7 +7,7 @@ homepage = "https://github.com/DonaldWhyte/double"
 documentation = "https://docs.rs/double"
 license = "MIT"
 readme = "README.md"
-keywords = [ "mock", "test", "testing", "double", "spy", "stub", "unit", "matcher", "matchers" ]
+keywords = [ "mock", "testing", "double", "matchers", "expectation" ]
 categories= [
     "development-tools::testing"
 ]
