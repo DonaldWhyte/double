@@ -5,6 +5,9 @@ use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
 
+mod matchers;
+
+type Ref<T> = Rc<RefCell<T>>;
 type OptionalRef<T> = Rc<RefCell<Option<T>>>;
 
 /// Used for tracking function call arguments and specifying a predetermined
@@ -19,13 +22,15 @@ pub struct Mock<C, R>
     where C: Clone + Eq + Hash,
           R: Clone
 {
-    default_return_value: Rc<RefCell<R>>,
+    // Ordered from lowest precedence to highest
+    default_return_value: Ref<R>,
+    return_value_sequence: Ref<Vec<R>>,
     default_fn: OptionalRef<fn(C) -> R>,
     default_closure: OptionalRef<Box<Fn(C) -> R>>,
-    return_values: Rc<RefCell<HashMap<C, R>>>,
-    fns: Rc<RefCell<HashMap<C, fn(C) -> R>>>,
-    closures: Rc<RefCell<HashMap<C, Box<Fn(C) -> R>>>>,
-    calls: Rc<RefCell<Vec<C>>>
+    return_values: Ref<HashMap<C, R>>,
+    fns: Ref<HashMap<C, fn(C) -> R>>,
+    closures: Ref<HashMap<C, Box<Fn(C) -> R>>>,
+    calls: Ref<Vec<C>>
 }
 
 impl<C, R> Mock<C, R>
@@ -35,13 +40,14 @@ impl<C, R> Mock<C, R>
     /// Creates a new `Mock` that will return `return_value`.
     pub fn new<T: Into<R>>(return_value: T) -> Self {
         Mock {
-            default_return_value: Rc::new(RefCell::new(return_value.into())),
-            default_fn: Rc::new(RefCell::new(None)),
-            default_closure: Rc::new(RefCell::new(None)),
-            return_values: Rc::new(RefCell::new(HashMap::new())),
-            fns: Rc::new(RefCell::new(HashMap::new())),
-            closures: Rc::new(RefCell::new(HashMap::new())),
-            calls: Rc::new(RefCell::new(vec![])),
+            default_return_value: Ref::new(RefCell::new(return_value.into())),
+            return_value_sequence: Ref::new(RefCell::new(Vec::new())),
+            default_fn: OptionalRef::new(RefCell::new(None)),
+            default_closure: OptionalRef::new(RefCell::new(None)),
+            return_values: Ref::new(RefCell::new(HashMap::new())),
+            fns: Ref::new(RefCell::new(HashMap::new())),
+            closures: Ref::new(RefCell::new(HashMap::new())),
+            calls: Ref::new(RefCell::new(vec![])),
         }
     }
 
@@ -56,7 +62,8 @@ impl<C, R> Mock<C, R>
     /// the mock falls back to default behaviour, in this order of precedence:
     ///     1. the return value returned by the default closure (if configured)
     ///     2. the return value returned by the default function (if configured)
-    ///     3. the default return value (always configured)
+    ///     3. next return value in default sequence (if sequence is not empty)
+    ///     4. the default return value (always configured)
     ///
     /// # Examples
     ///
@@ -67,6 +74,11 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call("something"), "return value");
     ///
     /// mock.return_value("different value");
+    /// assert_eq!(mock.call("something"), "different value");
+    ///
+    /// mock.return_values(vec!("one", "two"));
+    /// assert_eq!(mock.call("something"), "one");
+    /// assert_eq!(mock.call("something"), "two");
     /// assert_eq!(mock.call("something"), "different value");
     ///
     /// mock.use_fn(str::trim);
@@ -101,7 +113,13 @@ impl<C, R> Mock<C, R>
         } else if let Some(ref default_closure) = *self.default_closure.borrow() {
             return default_closure(args);
         } else {
-            self.default_return_value.borrow().clone()
+            // TODO: error if a retval sequence was specified but there's no
+            // more values left?
+            let ref mut sequence = *self.return_value_sequence.borrow_mut();
+            match sequence.pop() {
+                Some(return_value) => return_value,
+                None => self.default_return_value.borrow().clone()
+            }
         }
     }
 
@@ -117,8 +135,34 @@ impl<C, R> Mock<C, R>
     ///
     /// assert_eq!(mock.call("something"), "new value");
     /// ```
-    pub fn return_value<T: Into<R>>(&self, return_value: T) {
-        *self.default_return_value.borrow_mut() = return_value.into();
+    pub fn return_value<T: Into<R>>(&self, value: T) {
+        *self.default_return_value.borrow_mut() = value.into();
+    }
+
+    /// Provide a sequence of default return values. The specified are returned
+    /// in the same order they are specified in `values`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<&str, &str>::new("default");
+    /// mock.return_values(vec!("one", "two"));
+    ///
+    /// assert_eq!(mock.call("hello"), "one");
+    /// assert_eq!(mock.call("bye"), "two");
+    /// // ran out of values in the sequence, fall back to the default value
+    /// assert_eq!(mock.call("farewell"), "default");
+    /// ```
+    pub fn return_values<T: Into<R>>(&self, values: Vec<T>) {
+        // Reverse so efficient back pop() can be used to extract  the next
+        // value in the sequence
+        *self.return_value_sequence.borrow_mut() = values
+            .into_iter()
+            .map(|r| r.into())
+            .rev()
+            .collect();
     }
 
     /// Override the return value for a specific set of call arguments.
@@ -688,6 +732,7 @@ impl<C, R> Debug for Mock<C, R>
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Mock")
             .field("default_return_value", &self.default_return_value)
+            .field("return_value_sequence", &self.return_value_sequence)
             .field("return_values", &self.return_values)
             .field("calls", &self.calls)
             .finish()
