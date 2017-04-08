@@ -1,6 +1,6 @@
 [package]
 name = "double"
 version = "0.1.0"
-authors = ["Donald Whyte <donaldwhyte0@gmail.com>"]
+authors = ["Donald Whyte <donsoft@donsoft.io>"]
 
 [dependencies]
