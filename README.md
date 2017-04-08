@@ -4,8 +4,6 @@
 
 [![Build Status](https://travis-ci.org/DonaldWhyte/double.svg?branch=master)](https://travis-ci.org/DonaldWhyte/double) [![Docs](https://docs.rs/double/badge.svg)](https://docs.rs/double)
 
-[Documentation](https://docs.rs/double)
-
 Based off [**iredelmeier's**](https://github.com/iredelmeier/) initial mock implementation.
 
 Double lets you mock `Trait` implementations so that you can track function call arguments and set return values or overrides functions at test time.
