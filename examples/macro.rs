@@ -4,6 +4,10 @@ trait Dependency: Clone {
     fn profit(&self, revenue: u32, costs: u32) -> i32;
 }
 
+trait Greeter: Clone {
+    fn greet<S: AsRef<str>>(&mut self, name: S);
+}
+
 macro_rules! mock_trait {
     ( $mock_name:ident, $($method:ident($retval:ty)($($arg_type:ty),*))* ) => (
         #[derive(Debug, Clone)]
@@ -26,22 +30,24 @@ macro_rules! mock_trait {
 }
 
 macro_rules! mock_method {
-    ( $method:ident($retval:ty)($($arg_name:ident: $arg_type:ty),*) ) => (
+    ( $method:ident($retval:ty)(&self, $($arg_name:ident: $arg_type:ty),*) ) => (
         fn $method(&self, $($arg_name: $arg_type),*) -> $retval {
+            self.$method.call(($($arg_name),*))
+        }
+    );
+    ( $method:ident($retval:ty)(&mut self, $($arg_name:ident: $arg_type:ty),*) ) => (
+        fn $method(&mut self, $($arg_name: $arg_type),*) -> $retval {
             self.$method.call(($($arg_name),*))
         }
     )
 }
 
 mock_trait!(MockDependency, profit(i32)(u32, u32));
-
 impl Dependency for MockDependency {
-    mock_method!(profit(i32)(revenue: u32, costs: u32));
-
-    /*fn profit(&self, revenue: u32, costs: u32) -> i32 {
-        self.profit.call((revenue, costs))
-    }*/
+    mock_method!(profit(i32)(&self, revenue: u32, costs: u32));
 }
+
+mock_trait(MockGreeter, greet(())(String));
 
 fn main() {
     // Test individual return values
