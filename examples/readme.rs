@@ -1,16 +1,3 @@
-# Double
-
-### Full-featured mocking library in Rust, including rich failure messages and argument matchers.
-
-[![Build Status](https://travis-ci.org/DonaldWhyte/double.svg?branch=master)](https://travis-ci.org/DonaldWhyte/double) [![Docs](https://docs.rs/double/badge.svg)](https://docs.rs/double)
-
-Based off [**iredelmeier's**](https://github.com/iredelmeier/) initial mock implementation.
-
-Double lets you mock `Trait` implementations so that you can track function call arguments and set return values or overrides functions at test time.
-
-Here's a quick example:
-
-```rust
 #[macro_use]
 extern crate double;
 
@@ -50,17 +37,7 @@ fn test_correct_args_passed_to_balance_sheet() {
     sheet.profit.has_calls_exactly_in_order(vec!((500, 250)));
 }
 
-// Executing tests
 fn main() {
     test_weighting_is_applied();
     test_correct_args_passed_to_balance_sheet();
 }
-```
-
-More examples are available in the [examples directory](./examples).
-
-### Credits
-
-This library is based off [**iredelmeier's**](https://github.com/iredelmeier/) initial mocking implementation. Massive thanks to her implementation for inpsiring me to work on this. The repo for her library [**can be found here**](https://github.com/iredelmeier/pseudo).
-
-If you're interested in testing, check out her other repositories too!
