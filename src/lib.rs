@@ -63,4 +63,5 @@ pub use mock::Mock;
 
 pub type Double<C, R> = Mock<C, R>;
 
+mod macros;
 mod mock;
