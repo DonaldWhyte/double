@@ -15,48 +15,50 @@
 //! # Examples
 //!
 //! ```
-//! use double::Double;
+//! #[macro_use]
+//! extern crate double;
 //!
-//! trait Foo: Clone {
-//!     fn expensive_fn(&self, x: i64, y: i64) -> i64;
+//! // Code under test
+//! trait BalanceSheet {
+//!     fn profit(&self, revenue: u32, costs: u32) -> i32;
 //! }
 //!
-//! #[derive(Clone)]
-//! struct DoubleFoo {
-//!     pub expensive_fn: Double<(i64, i64), i64>,
+//! fn get_profit(revenue: u32, costs: u32, balance_sheet: &BalanceSheet) -> i32 {
+//!     balance_sheet.profit(revenue, costs)
 //! }
 //!
-//! impl Foo for DoubleFoo {
-//!     fn expensive_fn(&self, x: i64, y: i64) -> i64 {
-//!         self.expensive_fn.call((x + 10, y))
-//!     }
+//! // Tests which uses a mock BalanceSheet
+//! mock_trait!(
+//!     MockBalanceSheet,
+//!     profit(u32, u32) -> i32);
+//! impl BalanceSheet for MockBalanceSheet {
+//!     mock_method!(profit(&self, revenue: u32, costs: u32) -> i32);
 //! }
 //!
-//! fn double_expensive_fn<T: Foo>(foo: &T, x: i64, y: i64) -> i64 {
-//!     foo.expensive_fn(x, y) * 2
+//! fn test_weighting_is_applied() {
+//!     // GIVEN:
+//!     let sheet = MockBalanceSheet::default();
+//!     sheet.profit.return_value(250);
+//!     // WHEN:
+//!     let profit = get_profit(500, 250, &sheet);
+//!     // THEN:
+//!     assert_eq!(250, profit);
 //! }
 //!
-//! fn test_doubles_return_value() {
-//!     let mock = DoubleFoo { expensive_fn: Double::default() };
-//!
-//!     mock.expensive_fn.return_value(1000);
-//!
-//!     assert_eq!(double_expensive_fn(&mock, 1, 2), 2000);
+//! fn test_correct_args_passed_to_balance_sheet() {
+//!     // GIVEN:
+//!     let sheet = MockBalanceSheet::default();
+//!     // WHEN:
+//!     let _ = get_profit(500, 250, &sheet);
+//!     // THEN:
+//!     sheet.profit.has_calls_exactly_in_order(vec!((500, 250)));
 //! }
 //!
-//! fn test_uses_correct_args() {
-//!     let mock = DoubleFoo { expensive_fn: Double::default() };
-//!
-//!     assert!(!mock.expensive_fn.called());
-//!
-//!     double_expensive_fn(&mock, 1, 2);
-//!
-//!     assert_eq!(mock.expensive_fn.num_calls(), 1);
-//!     assert!(mock.expensive_fn.called_with((11, 2)));
+//! // Executing tests
+//! fn main() {
+//!     test_weighting_is_applied();
+//!     test_correct_args_passed_to_balance_sheet();
 //! }
-//!
-//! test_doubles_return_value();
-//! test_uses_correct_args();
 //! ```
 
 pub use mock::Mock;
