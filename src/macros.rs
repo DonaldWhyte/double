@@ -187,7 +187,7 @@ macro_rules! mock_method {
     // immutable, no return value, no type parameter, no body
     ( $method:ident(&self $(,$arg_name:ident: $arg_type:ty)*)) => (
         fn $method(&self $(,$arg_name: $arg_type)*) {
-            self.$method.call(($($arg_name),*))
+            self.$method.call(($($arg_name.clone()),*))
         }
     );
     // immutable, no return value, no type parameter, body
@@ -197,7 +197,7 @@ macro_rules! mock_method {
     // immutable, no return value, type parameter, no body
     ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*) ) => (
             fn $method<$($type_params)*>(&$sel $(,$arg_name: $arg_type)*) {
-                self.$method.call(($($arg_name),*))
+                self.$method.call(($($arg_name.clone()),*))
             }
     );
     // immutable, no return value, type parameter, body
@@ -208,7 +208,7 @@ macro_rules! mock_method {
     // immutable, return value, no type parameter, no body
     ( $method:ident(&self $(,$arg_name:ident: $arg_type:ty)*) -> $retval:ty ) => (
         fn $method(&self $(,$arg_name: $arg_type)*) -> $retval {
-            self.$method.call(($($arg_name),*))
+            self.$method.call(($($arg_name.clone()),*))
         }
     );
     // immutable, return value, no type parameter, body
@@ -219,7 +219,7 @@ macro_rules! mock_method {
     ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*)
         -> $retval:ty ) => (
             fn $method<$($type_params)*>(&self $(,$arg_name: $arg_type)*) -> $retval {
-                self.$method.call(($($arg_name),*))
+                self.$method.call(($($arg_name.clone()),*))
             }
     );
     // immutable, return value, type parameter, body
@@ -230,7 +230,7 @@ macro_rules! mock_method {
     // mutable, no return value, no type parameter, no body
     ( $method:ident(&mut self $(,$arg_name:ident: $arg_type:ty)*)) => (
         fn $method(&mut self $(,$arg_name: $arg_type),*) {
-            self.$method.call(($($arg_name),*))
+            self.$method.call(($($arg_name.clone()),*))
         }
     );
     // mutable, no return value, no type parameter, body
@@ -240,7 +240,7 @@ macro_rules! mock_method {
     // mutable, no return value, type parameter, no body
     ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*) ) => (
             fn $method<$($type_params)*>(&mut $sel $(,$arg_name: $arg_type)*) {
-                self.$method.call(($($arg_name),*))
+                self.$method.call(($($arg_name.clone()),*))
             }
     );
     // mutable, no return value, type parameter, body
@@ -251,7 +251,7 @@ macro_rules! mock_method {
     // mutable, return value, no type parameter, no body
     ( $method:ident(&mut self $(,$arg_name:ident: $arg_type:ty)*) -> $retval:ty ) => (
         fn $method(&mut self $(,$arg_name: $arg_type),*) -> $retval {
-            self.$method.call(($($arg_name),*))
+            self.$method.call(($($arg_name.clone()),*))
         }
     );
     // mutable, return value, no type parameter, body
@@ -262,7 +262,7 @@ macro_rules! mock_method {
     ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*)
         -> $retval:ty ) => (
             fn $method<$($type_params)*>(&mut self $(,$arg_name: $arg_type)*) -> $retval {
-                self.$method.call(($($arg_name),*))
+                self.$method.call(($($arg_name.clone()),*))
             }
     );
     // mutable, return value, type parameter, body
