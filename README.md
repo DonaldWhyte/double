@@ -58,9 +58,3 @@ fn main() {
 ```
 
 More examples are available in the [examples directory](./examples).
-
-### Credits
-
-This library is based off [**iredelmeier's**](https://github.com/iredelmeier/) initial mocking implementation. Massive thanks to her implementation for inpsiring me to work on this. The repo for her library [**can be found here**](https://github.com/iredelmeier/pseudo).
-
-If you're interested in testing, check out her other repositories too!
