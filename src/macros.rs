@@ -17,7 +17,9 @@
 ///     set_max_threads(u32) -> ()
 /// );
 ///
-/// # fn main() { }
+/// # fn main() {
+///     // only here to make `cargo test` happy
+/// }
 /// ```
 ///
 /// Then the following code is generated:
@@ -127,26 +129,81 @@ macro_rules! mock_trait {
 /// # }
 /// ```
 ///
-/// There are many different variants of `mock_method`. In total there are 16
-/// variants, each of which provides a combination of the following:
+/// There are many different variants of `mock_method`. In total there are 12
+/// variants. 8 variants provides a combination of the following:
 ///
-/// 1. const method (`&self`) or mutable method (`&mut self`)
-/// 2. return value (`fn foo(&self) -> bool`) / no return value (`fn foo(&self)`)
-/// 3. type parameters (`fn foo<T: Eq>(&self, a: &T)`) / no type parameters (`fn foo(&self, a: &str)`)
-/// 4. custom method body or automatically generated method body
+/// 1. const method (`&self`) **or** mutable method (`&mut self`)
+/// 2. return value (`fn foo(&self) -> bool`) **or** no return value (`fn foo(&self)`)
+/// 3. automatically generated method body **or** custom method body
 ///
-/// (1) allows both constant and mutable methods can be mocked, like in the
+/// (1) allows both constant and mutable methods tobe mocked, like in the
 /// `MockTaskManager` example above.
 ///
 /// (2) is for convenience. It means one doesn't have to specify `-> ()`
 /// explicitly for mocked methods that don't return values. This can also be
 /// shown in the `MockTaskManager` example. Notice how the return type is not
-/// specified when generating the `set_max_threads()` method.
+/// specified when generating the `set_max_threads()` mock.
 ///
-/// (3) allows one to generate mock methods which take some generic type
-/// parameters. For example, suppose one had a `Comparator` trait that was
-/// responsible for comparing any two values in the system. It might look
-/// something like this:
+/// (3) is useful when the stored call arguments' types (defined by the
+/// `mock_trait()` macro) are different to the mocked method. There are cases
+/// where type differences in the stored args and the actual method args are
+/// required. For example, suppose you had the following trait:
+///
+/// ```
+/// trait TextStreamWriter {
+///     fn write(text: &str);
+/// }
+/// ```
+///
+/// A mock can't _store_ received `text` arguments as `&str` because the mock
+/// needs to the _own_ the given arguments (and `&str` is a non-owning
+/// reference). Therefore, the mock trait has to be specified like so:
+///
+/// ```
+/// # #[macro_use] extern crate double;
+///
+/// trait TextStreamWriter {
+///     fn write(&mut self, text: &str);
+/// }
+///
+/// mock_trait!(
+///     MockTextStreamWriter,
+///     // have to use `String`, not `&str` here, since `&str` is a reference
+///     write(String) -> ()
+/// );
+///
+/// impl TextStreamWriter for MockTextStreamWriter {
+///     mock_method!(write(&mut self, text: &str), self, {
+///         // manually convert the reference to an owned `String` before
+///         self.write.call(text.to_owned())
+///     });
+/// }
+/// # fn main() {
+///     // only here to make `cargo test` happy
+/// }
+/// ```
+///
+/// Using variant (3) of `mock_method` means we specify the body of the
+/// generated function manually. The custom body simply converts the `&str`
+/// argument to an owned string and passes it into the underlying `write` `Mock`
+/// object manually. (normally auto-generated bodies do this for you).
+///
+/// The name of the underlying mock object is always the same as the mocked
+/// method's name.
+///
+/// `&str` parameters are common. It can be inconvient haven't to manually
+/// specify the body each time they appear. There are plans to add a macro to
+/// generate a body that calls `to_owned()` automatically.
+/// (TODO: implement the macro)
+///
+/// ### Type Parameters
+///
+/// There are an additional 4 variants to handle method type parameters
+/// (e.g. `fn foo<T: Eq>(&self, a: &T)`). These variants allow one to generate
+/// mock methods which take some generic type parameters.
+///
+/// For example, suppose one had a `Comparator` trait that was responsible for
+/// comparing any two values in the program. It might look something like this:
 ///
 /// ```
 /// trait Comparator {
@@ -154,34 +211,57 @@ macro_rules! mock_trait {
 /// }
 /// ```
 ///
-/// TODO
+/// `T` can be multiple types. Currently, we cannot store call arguments that
+/// have generic types in the underlying `Mock` objects. Therefore, one has to
+/// convert the generic types to a different, common representation. One way
+/// to get around this limitation is converting each generic type to a `String`.
+/// e.g. for the `Comparator` trait:
 ///
 /// ```
 /// # #[macro_use] extern crate double;
+///
+/// use std::string::ToString;
+///
 /// trait Comparator {
-///    fn is_equal<T: Eq>(&self, a: &T, b: &T) -> bool;
+///    fn is_equal<T: Eq + ToString>(&self, a: &T, b: &T) -> bool;
 /// }
 ///
 /// mock_trait!(
 ///     MockComparator,
+///     // store all passed in call args as strings
 ///     is_equal((String, String)) -> bool
 /// );
 ///
 /// impl Comparator for MockComparator {
-///     mock_method!(is_equal<(T: Eq)>(&self, a: &T, b: &T) -> bool);
+///     mock_method!(is_equal<(T: Eq + ToString)>(&self, a: &T, b: &T) -> bool, self, {
+///         // Convert both arguments to strings and manually pass to underlying
+///         // mock object.
+///         // Notice how the both arguments as passed as a single tuple. The
+///         // underlying mock object always expects a single tuple.
+///         self.is_equal.call((a.to_string(), b.to_string()))
+///     });
 /// }
 /// # fn main() {
-/// // TODO
-/// # }
+///     // only here to make `cargo test` happy
+/// }
 /// ```
 ///
-/// (4) TODO.
+/// If the `to_string` conversions for all `T` are not lossy, then our mock
+/// expectations can be exact. If the `to_string` conversions _are_ lossy, then
+/// this mechanism can still be used, providing all the properties of the passed
+/// in objects are captured in the resultant `String`s.
 ///
-/// TODO: str / string
+/// This approach requires the writer to ensure the code under test adds the
+/// `ToString` trait to the `trait`'s type argument constraints. This limitation
+/// forces test writers to modify production code to use `double` for mocking.
 ///
-/// For detailed instructions and examples on how to use the different variants
-/// of this macro, take a look at the
-/// [**GitHub repo**](https://github.com/DonaldWhyte/double)).
+/// Despite this, there is still value in using `double` for mocking generic
+/// methods with type arguments. Despite adding boilerplate to production code
+/// and manually implementing mock method bodies being cumbersome, the value add
+/// is that all argument matching, expectations, calling test functions, etc.
+/// are all still handled by `double`. Arguably, re-implenting those features is
+/// more cumbersome than the small amount of boilerplate required to mock
+/// methods with type arguments.
 #[macro_export]
 macro_rules! mock_method {
 
@@ -198,11 +278,7 @@ macro_rules! mock_method {
     );
 
     // immutable, no return value, type parameter, no body
-    ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*) ) => (
-            fn $method<$($type_params)*>(&$sel $(,$arg_name: $arg_type)*) {
-                self.$method.call(($($arg_name.clone()),*))
-            }
-    );
+    // not provided, since type parameters need a custom body 99% of the time
 
     // immutable, no return value, type parameter, body
     ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*),
@@ -223,12 +299,7 @@ macro_rules! mock_method {
     );
 
     // immutable, return value, type parameter, no body
-    ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*)
-        -> $retval:ty ) => (
-            fn $method<$($type_params)*>(&self $(,$arg_name: $arg_type)*) -> $retval {
-                self.$method.call(($($arg_name.clone()),*))
-            }
-    );
+    // not provided, since type parameters need a custom body 99% of the time
 
     // immutable, return value, type parameter, body
     ( $method:ident<($($type_params: tt)*)>(&self $(,$arg_name:ident: $arg_type:ty)*)
@@ -249,11 +320,7 @@ macro_rules! mock_method {
     );
 
     // mutable, no return value, type parameter, no body
-    ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*) ) => (
-            fn $method<$($type_params)*>(&mut $sel $(,$arg_name: $arg_type)*) {
-                self.$method.call(($($arg_name.clone()),*))
-            }
-    );
+    // not provided, since type parameters need a custom body 99% of the time
 
     // mutable, no return value, type parameter, body
     ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*),
@@ -274,12 +341,7 @@ macro_rules! mock_method {
     );
 
     // mutable, return value, type parameter, no body
-    ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*)
-        -> $retval:ty ) => (
-            fn $method<$($type_params)*>(&mut self $(,$arg_name: $arg_type)*) -> $retval {
-                self.$method.call(($($arg_name.clone()),*))
-            }
-    );
+    // not provided, since type parameters need a custom body 99% of the time
 
     // mutable, return value, type parameter, body
     ( $method:ident<($($type_params: tt)*)>(&mut self $(,$arg_name:ident: $arg_type:ty)*)

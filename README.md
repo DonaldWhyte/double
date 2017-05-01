@@ -51,3 +51,11 @@ fn main() {
 ```
 
 More examples are available in the [examples directory](./examples).
+
+### Using the Mock Generation Macros
+
+TODO
+
+### Using `Mock` Objects Manually
+
+TODO

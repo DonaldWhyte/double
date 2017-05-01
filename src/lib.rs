@@ -1,7 +1,7 @@
 //! Double is a fully-featured mocking library for mocking `trait`
 //! implementations.
 //!
-//! The `Double` struct tracks function call arguments and specifies return
+//! The `Mock` struct tracks function call arguments and specifies return
 //! values or function overrides.
 //!
 //! This library is based off iredelmeier's initial mocking implementation.
@@ -55,8 +55,6 @@
 //! ```
 
 pub use mock::Mock;
-
-pub type Double<C, R> = Mock<C, R>;
 
 mod macros;
 mod mock;
