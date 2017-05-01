@@ -175,6 +175,7 @@ macro_rules! mock_trait {
 /// impl TextStreamWriter for MockTextStreamWriter {
 ///     mock_method!(write(&mut self, text: &str), self, {
 ///         // manually convert the reference to an owned `String` before
+///         // passing it to the underlying mock object
 ///         self.write.call(text.to_owned())
 ///     });
 /// }
@@ -191,7 +192,7 @@ macro_rules! mock_trait {
 /// The name of the underlying mock object is always the same as the mocked
 /// method's name.
 ///
-/// `&str` parameters are common. It can be inconvient haven't to manually
+/// `&str` parameters are common. It can be inconvenient haven't to manually
 /// specify the body each time they appear. There are plans to add a macro to
 /// generate a body that calls `to_owned()` automatically.
 /// (TODO: implement the macro)
@@ -259,7 +260,7 @@ macro_rules! mock_trait {
 /// methods with type arguments. Despite adding boilerplate to production code
 /// and manually implementing mock method bodies being cumbersome, the value add
 /// is that all argument matching, expectations, calling test functions, etc.
-/// are all still handled by `double`. Arguably, re-implenting those features is
+/// are all still handled by `double`. Arguably, reimplenting those features is
 /// more cumbersome than the small amount of boilerplate required to mock
 /// methods with type arguments.
 #[macro_export]
