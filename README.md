@@ -6,7 +6,7 @@
 
 Based off [**iredelmeier's**](https://github.com/iredelmeier/) initial mock implementation.
 
-Double lets you mock `Trait` implementations so that you can track function call arguments and set return values or overrides functions at test time.
+Double lets you mock `trait` implementations so that you can track function call arguments and set return values or overrides functions at test time.
 
 Here's a quick example:
 
@@ -19,11 +19,11 @@ trait BalanceSheet {
     fn profit(&self, revenue: u32, costs: u32) -> i32;
 }
 
-fn get_profit(revenue: u32, costs: u32, balance_sheet: &BalanceSheet) -> i32 {
-    balance_sheet.profit(revenue, costs)
+fn double_profit(revenue: u32, costs: u32, balance_sheet: &BalanceSheet) -> i32 {
+    balance_sheet.profit(revenue, costs) * 2
 }
 
-// Tests which uses a mock BalanceSheet
+// Test which uses a mock BalanceSheet
 mock_trait!(
     MockBalanceSheet,
     profit(u32, u32) -> i32);
@@ -31,30 +31,31 @@ impl BalanceSheet for MockBalanceSheet {
     mock_method!(profit(&self, revenue: u32, costs: u32) -> i32);
 }
 
-fn test_weighting_is_applied() {
+fn test_doubling_a_sheets_profit() {
     // GIVEN:
     let sheet = MockBalanceSheet::default();
     sheet.profit.return_value(250);
     // WHEN:
-    let profit = get_profit(500, 250, &sheet);
+    let profit = double_profit(500, 250, &sheet);
     // THEN:
-    assert_eq!(250, profit);
-}
-
-fn test_correct_args_passed_to_balance_sheet() {
-    // GIVEN:
-    let sheet = MockBalanceSheet::default();
-    // WHEN:
-    let _ = get_profit(500, 250, &sheet);
-    // THEN:
+    // mock return 250, which was double
+    assert_eq!(500, profit);
+    // assert that the revenue and costs were correctly passed to the mock
     sheet.profit.has_calls_exactly_in_order(vec!((500, 250)));
 }
 
-// Executing tests
+// Executing test
 fn main() {
-    test_weighting_is_applied();
-    test_correct_args_passed_to_balance_sheet();
+    test_doubling_a_sheets_profit();
 }
 ```
 
 More examples are available in the [examples directory](./examples).
+
+### Using the Mock Generation Macros
+
+TODO
+
+### Using `Mock` Objects Manually
+
+TODO
