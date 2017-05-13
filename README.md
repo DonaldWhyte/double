@@ -162,7 +162,7 @@ let sheet2 = MockBalanceSheet::default();
 sheet.use_fn(subtract);
 ```
 
-Code examples on how to use these are available in the ![**rustdocs**](https://docs.rs/double).
+Code examples on how to use these are available in the [**rustdocs**](https://docs.rs/double).
 
 It is possible to use many of these in conjunction. For example, one can tell a mock to return a specific value for args `(42, 10)` using `return_value_for()`, but return the default value of 1 for everything else using `return_value()`.
 
