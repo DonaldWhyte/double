@@ -128,43 +128,91 @@ fn test_balance {
 
 #### GIVEN: Setting Mock Behaviour
 
-TODO: explain table below with precedence
+Mocks can be configured to return a single value, a sequence of values (one value for each call) or invoke a function/closure. Additionally, it is possible to make a mock return special values/invoke special functions when specific arguments are passed in.
+
+These behaviours are configured by invoking methods on the mock objects themselves. These methods are listed in the table below.
 
 | Method | What It Does |
 | ------ | ------------ |
-| `use_fn_for((args), Fn(...) -> retval)` | invoke given function |
-| `use_closure_for((args), &Fn(...) -> retval)` | TODO |
-| `return_value_for((args), retval)` | TODO |
-| `use_fn(Fn(...) -> retval)` | TODO |
-| `use_closure(&Fn(...) -> retval)` | TODO |
-| `return_values(vec<retval>)` | TODO |
-| `return_value(retval)` | TODO |
+| `use_fn_for((args), Fn(...) -> retval)` | invoke given function and return the value it returns when specified `(args)` are passed in |
+| `use_closure_for((args), &Fn(...) -> retval)` | invoke given closure and return the value it returns when specified `(args)` are passed in |
+| `return_value_for((args), val)` | return `val` when specified `(args)` are passed in |
+| `use_fn(Fn(...) -> retval)` | invoke given function and return the value it returns by default |
+| `use_closure(&Fn(...) -> retval)` | invoke given closure and return the value it returns by default |
+| `return_values(vec<retval>)` | return values in given vector by default, return one value for each invocation of the mock method. If there are no more values in the vector, return the default value specified by `return_value()`  |
+| `return_value(val)` | return `val` by default |
 
-TODO: examples in the rustdocs on above
+If no behaviour is specified, the mock will just return the default value of the return type, as specified by the `Default` trait.
 
-TODO: convenience functions for default return vlaue
+Example usage:
 
-| Method | Returns | What It Does |
-| ------ | ------- | ------------ |
-| `return_some` | `Some(val)` | TODO |
-| `return_none` | `None` | TODO |
-| `return_ok` | `Ok(val)` | TODO |
-| `return_err` | `Err(val)` | TODO |
+```
+// Configure mock to return 9001 profit when given args 42 and 10. Any other
+// arguments will cause the mock to return a profit of 1.
+let sheet = MockBalanceSheet::default();
+sheet.profit.return_value_for((42, 10), 9001);
+sheet.profit.return_value(1);
+
+// Configure mock to call arbitrary function. The mock will return the
+// result of the function back to the caller.
+fn subtract(revenue: u32, costs: u32) -> i32 {
+    revenue - costs
+}
+let sheet2 = MockBalanceSheet::default();
+sheet.use_fn(subtract);
+```
+
+Code examples on how to use these are available in the ![**rustdocs**](https://docs.rs/double).
+
+It is possible to use many of these in conjunction. For example, one can tell a mock to return a specific value for args `(42, 10)` using `return_value_for()`, but return the default value of 1 for everything else using `return_value()`.
+
+When a mock method is invoked, it uses a precdence order to determine if it should return a default value, return a specific value, invoke a function and so on.
+
+The precedence order of these methods is the same order they are specified in the above table. For example, if `use_fn` and `return_value` are invoked, then the mock will invoke the function passed to `use_fn` and not return a value.
+
+If a method returns an `Option<T>` or a `Result<T, E>`, then one can use the following convenience functions for specifying default return values:
+
+| Method        | Returns     | What It Does                         |
+| ------------- | ----------- | ------------------------------------ |
+| `return_some` | `Some(val)` | return `Some(val)` enum of `Option`  |
+| `return_none` | `None`      | returs the `None` enum of `Option`   |
+| `return_ok`   | `Ok(val)`   | return `Ok(val)` enum of `Result`    |
+| `return_err`  | `Err(val)`   | return `Err(val)` enum of `Result`   |
 
 #### THEN: Asserting Code Under Test Used Mock in Expected Way
 
-TODO: explain what below are used for, and that they return true/false
+After the test has run, we can verify the mock was called the right number of times and with the right arguments.
 
-| Method | What It Does |
-| ------ | ------------ |
-| `calls()` | TODO |
-| `called()` | TODO |
-| `num_calls()` | TODO |
-| `called_with()` | TODO |
-| `has_calls()` | TODO |
-| `has_calls_in_order()` | TODO |
-| `has_calls_exactly()` | TODO |
-| `has_calls_exactly_in_order()` | TODO |
+The table below lists the methods that can be used to verify the mock was invoked as expected.
+
+| Method                                          | Returns       | What It Does |
+| ----------------------------------------------- | ------------- | ------------ |
+| `calls()`                                       | `Vec<(Args)>` | return the arguments of each mock invocation, ordered by invocation time |
+| `called()`                                      | `bool`        | return `true` if method was called at least once |
+| `num_calls()`                                   | `usize`       | number of times method was called |
+| `called_with((args))`                           | `bool`        | return `true` if method was called at least once with given `args` |
+| `has_calls(vec!((args), ...))`                  | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
+| `has_calls_in_order(vec!((args), ...))`         | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| `has_calls_exactly(vec!((args), ...))`          | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
+| `has_calls_exactly_in_order(vec!((args), ...))` | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+
+Example usage:
+
+```
+let sheet = MockBalanceSheet::default();
+
+// invoke mock method
+sheet.profit(42, 10);
+sheet.profit(5, 0);
+
+// assert the invocation was recorded correctly
+assert!(sheet.profit.called());
+assert!(sheet.profit.called_with((42, 10)));
+assert!(sheet.profit.has_calls((42, 10)));
+assert!(sheet.profit.has_calls_in_order((42, 10), (5, 0)));
+assert!(sheet.profit.has_calls_exactly((5, 0), (42, 10)));
+assert!(sheet.profit.has_calls_exactly_in_order((42, 10), (5, 0)));
+```
 
 #### Reusing Mocks Across Multiple Tests
 
