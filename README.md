@@ -52,7 +52,7 @@ More examples are available in the [examples directory](./examples).
 
 ### Defining a Mock
 
-Mocking a `trait` requires two steps. One to generate the mock `struct` that will implement the mock, and another to generate the bodies of the mocked `trait` methods.
+Mocking a `trait` requires two steps. One to generate the mock `struct` that will implement the mock and another to generate the bodies of the mocked `trait` methods.
 
 For step one, we use the `mock_trait` macro. This takes the name of the mock `struct` to generate and a list specifying all of the `trait`'s methods, their arguments (omitting `self`) and their return values (specifying `-> ()` if the method does not return a value).
 
@@ -243,8 +243,39 @@ This approach requires the writer to ensure the code under test adds the `ToStri
 
 Despite this, there is still value in using `double` for mocking generic methods with type arguments. Despite adding boilerplate to production code and manually implementing mock method bodies being cumbersome, the value add is that all argument matching, expectations, calling test functions, etc. are all still handled by `double`.
 
-The authord of double argue that reimplenting the aforementined features is more cumbersome than the small amount of boilerplate required to mock methods with type arguments.
+The authors of double argue that reimplenting the aforementined features is more cumbersome than the small amount of boilerplate required to mock methods with type arguments.
 
 #### Using double Mocks for Free Functions
 
-TODO
+`double::Mock` objects can also be used for free functions. Consider the following function:
+
+```
+fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
+    weighting_fn(value * 2)
+}
+```
+
+This doubles some input value and applies a weighting to it. Suppose the weighting function can vary. For example, let's say the weighting function to use depends on user provided config. This means we need to pass a generic weighting function as a parameter.
+
+Rather than generate your own mock weighting function boilerplate when testinh `calculate_factor`, one can directly use `double::Mock`:
+
+```
+fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
+    weighting_fn(value * 2)
+}
+
+fn main() {
+    let mock_weighting_fn = Mock::<i32, i32>::default();
+    mock_weighting_fn.return_value(100);
+
+    // Wrap mock in a closure that is passed to the function under test. Note
+    // how the closure is passed as a _reference_ for this
+    // (e.g. &|x: i32| ...)
+    let result = calculate_factor(42, &|x: i32| mock_weighting_fn.call(x));
+
+    assert_eq!(100, result);
+    assert!(mock_weighting_fn.has_calls_exactly(
+        vec!(84)  // input arg should be doubled by calculate_factor()
+    ));
+}
+```
