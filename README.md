@@ -126,21 +126,55 @@ fn test_balance {
 }
 ```
 
-#### (1) GIVEN: Setting Mock Behaviour
+#### GIVEN: Setting Mock Behaviour
 
-TODO
+TODO: explain table below with precedence
 
-#### (2) WHEN: Using Mock in Code Under Test
+| Method | What It Does |
+| ------ | ------------ |
+| `use_fn_for((args), Fn(...) -> retval)` | invoke given function |
+| `use_closure_for((args), &Fn(...) -> retval)` | TODO |
+| `return_value_for((args), retval)` | TODO |
+| `use_fn(Fn(...) -> retval)` | TODO |
+| `use_closure(&Fn(...) -> retval)` | TODO |
+| `return_values(vec<retval>)` | TODO |
+| `return_value(retval)` | TODO |
 
-TODO
+TODO: examples in the rustdocs on above
 
-#### (3) THEN: Asserting Code Under Test Used Mock in Expected Way
+TODO: convenience functions for default return vlaue
 
-TODO
+| Method | Returns | What It Does |
+| ------ | ------- | ------------ |
+| `return_some` | `Some(val)` | TODO |
+| `return_none` | `None` | TODO |
+| `return_ok` | `Ok(val)` | TODO |
+| `return_err` | `Err(val)` | TODO |
+
+#### THEN: Asserting Code Under Test Used Mock in Expected Way
+
+TODO: explain what below are used for, and that they return true/false
+
+| Method | What It Does |
+| ------ | ------------ |
+| `calls()` | TODO |
+| `called()` | TODO |
+| `num_calls()` | TODO |
+| `called_with()` | TODO |
+| `has_calls()` | TODO |
+| `has_calls_in_order()` | TODO |
+| `has_calls_exactly()` | TODO |
+| `has_calls_exactly_in_order()` | TODO |
+
+#### Reusing Mocks Across Multiple Tests
+
+Invoke `reset_calls()` to clear all recorded calls of a mock method.
+
+To ensure individual tests are as isolated (thus, less likely to have bugs) as possible, it is recommended that different mock objects are constructed for different test cases.
+
+Nevertheless, there might a some case where reusing the same mock and its return values results in easier to read and more maintainable test code. In those cases, `reset_calls()` can be used to clear calls from previous tests.
 
 ### Other Use Cases
-
-TODO
 
 #### Mocking Methods without a Return Value
 
