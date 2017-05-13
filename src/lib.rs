@@ -4,14 +4,6 @@
 //! The `Mock` struct tracks function call arguments and specifies return
 //! values or function overrides.
 //!
-//! This library is based off iredelmeier's initial mocking implementation.
-//! Massive thanks to her implementation for inpsiring me to work on this. Her
-//! repo can be found here:
-//!
-//! https://github.com/iredelmeier/pseudo
-//!
-//! If you're interested in testing, check out her other repositories too!
-//!
 //! # Examples
 //!
 //! ```
