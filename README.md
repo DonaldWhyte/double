@@ -58,7 +58,7 @@ For step one, we use the `mock_trait` macro. This takes the name of the mock `st
 
 Consider the example below:
 
-```
+```rust
 trait BalanceSheet {
     fn profit(&self, revenue: u32, costs: u32) -> i32;
     fn clear(&mut self);
@@ -74,7 +74,7 @@ Here, we generate a `struct` called `MockBalanceSheet`. This struct contains all
 
 For step 2, we generate the bodies of the mocked methods. The generated bodies contain boilerplate code for passing the method's arguments to the underlying `double::Mock` objects using `mock_method`. For example:
 
-```
+```rust
 impl BalanceSheet for MockBalanceSheet {
     mock_method!(profit(&self, revenue: u32, costs: u32) -> i32);
     mock_method!(clear(&mut self));
@@ -95,7 +95,7 @@ Tests with mocks are typically structured like so:
 
 For example, suppose we wish to test some code that uses a `BalanceSheet` generate a HTML page showing the current profit of something:
 
-```
+```rust
 fn generate_profit_page<T: BalanceSheet>(revenue: u32, costs: u32, sheet: &T) {
     let profit_str = sheet.profit(revenue, costs).to_string();
     return "<html><body><p>Profit is: $" + profit_str + "</p></body></html>";
@@ -104,7 +104,7 @@ fn generate_profit_page<T: BalanceSheet>(revenue: u32, costs: u32, sheet: &T) {
 
 We can use our generated `MockBalanceSheet` to test this function:
 
-```
+```rust
 fn test_balance {
     // GIVEN:
     // create instance of mock and configure its behaviour (will return 42)
@@ -146,7 +146,7 @@ If no behaviour is specified, the mock will just return the default value of the
 
 Example usage:
 
-```
+```rust
 // Configure mock to return 9001 profit when given args 42 and 10. Any other
 // arguments will cause the mock to return a profit of 1.
 let sheet = MockBalanceSheet::default();
@@ -198,7 +198,7 @@ The table below lists the methods that can be used to verify the mock was invoke
 
 Example usage:
 
-```
+```rust
 let sheet = MockBalanceSheet::default();
 
 // invoke mock method
@@ -228,7 +228,7 @@ Nevertheless, there might a some case where reusing the same mock and its return
 
 If a method does not return anything, the return value can be omitted when generating the method using double's macros:
 
-```
+```rust
 trait Queue {
     fn enqueue(&mut self, value: i32);
     fn dequeue(&mut self) -> i32;
@@ -250,7 +250,7 @@ impl Queue for MockQueue {
 
 This is because a mock cannot _store_ received `&str` arguments. The mock needs to the _own_ the given arguments and `&str` is a non-owning reference. Therefore, the mock trait has to be specified like so:
 
-```
+```rust
 trait TextStreamWriter {
     fn write(&mut self, text: &str);
 }
@@ -281,7 +281,7 @@ method's name. So in the custom `write` body, you should pass the arguments down
 
 Mocking methods with generic type parameters require extra effort. For example, suppose one had a `Comparator` trait that was responsible for comparing any two values in the program. It might look something like this:
 
-```
+```rust
 trait Comparator {
    fn is_equal<T: Eq>(&self, a: &T, b: &T) -> bool;
 }
@@ -293,7 +293,7 @@ convert the generic types to a different, common representation. One way
 to get around this limitation is converting each generic type to a `String`.
 e.g. for the `Comparator` trait:
 
-```
+```rust
 # #[macro_use] extern crate double;
 
 use std::string::ToString;
@@ -331,7 +331,7 @@ The authors of double argue that reimplenting the aforementined features is more
 
 `double::Mock` objects can also be used for free functions. Consider the following function:
 
-```
+```rust
 fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
     weighting_fn(value * 2)
 }
@@ -339,9 +339,9 @@ fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
 
 This doubles some input value and applies a weighting to it. Suppose the weighting function can vary. For example, let's say the weighting function to use depends on user provided config. This means we need to pass a generic weighting function as a parameter.
 
-Rather than generate your own mock weighting function boilerplate when testinh `calculate_factor`, one can directly use `double::Mock`:
+Rather than generate your own mock weighting function boilerplate when testing `calculate_factor`, one can directly use `double::Mock`:
 
-```
+```rust
 fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
     weighting_fn(value * 2)
 }
