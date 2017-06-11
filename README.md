@@ -36,7 +36,7 @@ fn test_doubling_a_sheets_profit() {
     // WHEN:
     let profit = double_profit(500, 250, &sheet);
     // THEN:
-    // mock return 250, which was double
+    // mock returned 250, which was doubled
     assert_eq!(500, profit);
     // assert that the revenue and costs were correctly passed to the mock
     sheet.profit.has_calls_exactly_in_order(vec!((500, 250)));
