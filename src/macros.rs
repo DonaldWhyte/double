@@ -90,6 +90,25 @@ macro_rules! mock_trait {
             }
         }
     );
+
+    (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
+        #[derive(Debug, Clone)]
+        pub struct $mock_name {
+            $(
+                $method: double::Mock<(($($arg_type),*)), $retval>
+            ),*
+        }
+
+        impl Default for $mock_name {
+            fn default() -> Self {
+                $mock_name {
+                    $(
+                        $method: double::Mock::default()
+                    ),*
+                }
+            }
+        }
+    );
 }
 
 /// Macro that generates a mock implementation of a `trait` method.
