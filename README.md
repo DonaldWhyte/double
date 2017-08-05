@@ -246,7 +246,7 @@ impl Queue for MockQueue {
 
 #### Mocking Methods That Take `&str` References
 
-`&str` is a common argument type. However, double does not support mocking methods with `&str` arguments with additional boilerplaye.
+`&str` is a common argument type. However, double does not support mocking methods with `&str` arguments with additional boilerplate.
 
 This is because a mock cannot _store_ received `&str` arguments. The mock needs to the _own_ the given arguments and `&str` is a non-owning reference. Therefore, the mock trait has to be specified like so:
 
