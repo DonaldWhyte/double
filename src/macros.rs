@@ -329,7 +329,7 @@ macro_rules! mock_method {
 
     // mutable, no return value, no type parameter, no body
     ( $method:ident(&mut self $(,$arg_name:ident: $arg_type:ty)*)) => (
-        fn $method(&mut self $(,$arg_name: $arg_type),*) {
+        fn $method(&mut self $(,$arg_name: $arg_type)*) {
             self.$method.call(($($arg_name.clone()),*))
         }
     );
@@ -350,7 +350,7 @@ macro_rules! mock_method {
 
     // mutable, return value, no type parameter, no body
     ( $method:ident(&mut self $(,$arg_name:ident: $arg_type:ty)*) -> $retval:ty ) => (
-        fn $method(&mut self $(,$arg_name: $arg_type),*) -> $retval {
+        fn $method(&mut self $(,$arg_name: $arg_type)*) -> $retval {
             self.$method.call(($($arg_name.clone()),*))
         }
     );
