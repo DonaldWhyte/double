@@ -1,6 +1,6 @@
 [package]
 name = "double"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Donald Whyte <donsoft@donsoft.io>"]
 repository = "https://github.com/DonaldWhyte/double"
 homepage = "https://github.com/DonaldWhyte/double"
