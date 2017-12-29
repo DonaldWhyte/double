@@ -451,7 +451,7 @@ impl<C, R> Default for Mock<C, R>
 }
 
 impl<C, R> Mock<C, R>
-    where C: Clone + Debug + Eq + Hash + PartialEq,
+    where C: Clone + Debug + Eq + Hash,
           R: Clone
 {
     /// Returns true if the specified argument has been used for `Mock::call`.
