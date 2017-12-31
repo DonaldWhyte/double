@@ -1,8 +1,8 @@
 // Private macros. They need to be exported and made public so they can be used
 // in the actual public facing macros. Ideally these would be inaccessible to
-// clients, but since that's not possible, we at least make it explicitly that
+// clients, but since that's not possible, we at least make it explicit that
 // these are intended to be private by prepending the macro names with
-// "__private" .
+// "__private".
 #[macro_export]
 macro_rules! __private_mock_trait_default_impl {
     ($mock_name:ident $(, $method:ident)*) => (
@@ -117,6 +117,7 @@ macro_rules! mock_trait {
             ),*
         }
 
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
         __private_mock_trait_default_impl!($mock_name $(, $method)*);
     );
 
@@ -128,6 +129,7 @@ macro_rules! mock_trait {
             ),*
         }
 
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
         __private_mock_trait_default_impl!($mock_name $(, $method)*);
     );
 }
@@ -220,7 +222,6 @@ macro_rules! mock_trait_no_default {
         }
 
         __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
-
     );
 
     (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (

@@ -31,7 +31,35 @@ fn test_doubling_a_sheets_profit() {
     sheet.profit.has_calls_exactly_in_order(vec!((500, 250)));
 }
 
-// Executing test
+// `Result` does not implement the `Default` trait. Trying to mock `UserStore`
+// using the `mock_trait!` macro will fail. We use `mock_trait_no_default!`
+// instead.
+pub trait UserStore {
+    fn get_username(&self, id: i32) -> Result<String, String>;
+}
+
+mock_trait_no_default!(
+    MockUserStore,
+    get_username(i32) -> Result<String, String>);
+
+impl UserStore for MockUserStore {
+    mock_method!(get_username(&self, id: i32) -> Result<String, String>);
+}
+
+fn test_manually_setting_default_retval() {
+    // GIVEN:
+    // Construct instance of the mock, manually specifying the default
+    // return value for `get_username()`.
+    let mock = MockUserStore::new(
+        Ok("default_user_name".to_owned()));
+    // WHEN:
+    let result = mock.get_username(10001);
+    // THEN:
+    assert_eq!(Ok("default_username".to_owned()), result);
+}
+
+// Executing tests
 fn main() {
     test_doubling_a_sheets_profit();
+    test_manually_setting_default_retval();
 }
