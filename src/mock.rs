@@ -28,7 +28,8 @@ pub struct Mock<C, R>
     return_values: Ref<HashMap<C, R>>,
     fns: Ref<HashMap<C, fn(C) -> R>>,
     closures: Ref<HashMap<C, Box<Fn(C) -> R>>>,
-    calls: Ref<Vec<C>>
+
+    calls: Ref<Vec<C>>,
 }
 
 impl<C, R> Mock<C, R>
@@ -102,7 +103,7 @@ impl<C, R> Mock<C, R>
 
         if let Some(ref closure) = self.closures.borrow().get(&args) {
             return closure(args)
-        } else if  let Some(ref function) = self.fns.borrow().get(&args) {
+        } else if let Some(ref function) = self.fns.borrow().get(&args) {
             return function(args)
         } else if let Some(return_value) = self.return_values.borrow().get(&args) {
             return return_value.clone()
@@ -425,6 +426,7 @@ impl<C, R> Mock<C, R>
     }
 }
 
+// TODO: only implement this if there is a `Default` impl in R?
 impl<C, R> Default for Mock<C, R>
     where C: Clone + Eq + Hash,
           R: Clone + Default
