@@ -1,12 +1,49 @@
-/// Macro that generates a `struct` implementation of a specified trait.
+// Private macros. They need to be exported and made public so they can be used
+// in the actual public facing macros. Ideally these would be inaccessible to
+// clients, but since that's not possible, we at least make it explicit that
+// these are intended to be private by prepending the macro names with
+// "__private".
+#[macro_export]
+macro_rules! __private_mock_trait_default_impl {
+    ($mock_name:ident $(, $method:ident)*) => (
+         impl Default for $mock_name {
+            fn default() -> Self {
+                Self {
+                    $( $method: double::Mock::default() ),*
+                }
+            }
+        }
+    );
+}
+
+#[macro_export]
+macro_rules! __private_mock_trait_new_impl {
+    ($mock_name:ident $(, $method:ident: $retval: ty)*) => (
+        impl $mock_name {
+            pub fn new( $($method: $retval),* ) -> Self {
+                Self {
+                    $( $method: double::Mock::new($method) ),*
+                }
+            }
+        }
+    );
+}
+
+/// Macro that generates a `struct` implementation of a trait.
+///
+/// Use this instead of `mock_trait_no_default!` if all mocked method return
+/// types implement `Default`. If one or more of the return types do not
+/// implement `Default`, then `mock_trait_no_default!` must be used to generate
+/// the mock.
 ///
 /// This macro generates a `struct` that implements the traits `Clone`, `Debug`
-/// and `Default`. Create instances of the mock object by calling the `struct`'s
-/// `default()` method.
+/// and `Default`. Create instances of the mock object by calling the
+/// `struct`'s `default()` method, or specify custom default return values for
+/// each mocked method using `new()`.
 ///
-/// The `struct` has a field for each method of the `trait`, which manages their
-/// respective method's behaviour and call expectations. For example, if one
-/// defines a mock like so:
+/// The `struct` has a field for each method of the `trait`, which manages
+/// their respective method's behaviour and call expectations. For example, if
+/// one defines a mock like so:
 ///
 /// ```
 /// # #[macro_use] extern crate double;
@@ -80,15 +117,8 @@ macro_rules! mock_trait {
             ),*
         }
 
-        impl Default for $mock_name {
-            fn default() -> Self {
-                $mock_name {
-                    $(
-                        $method: double::Mock::default()
-                    ),*
-                }
-            }
-        }
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        __private_mock_trait_default_impl!($mock_name $(, $method)*);
     );
 
     (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
@@ -99,15 +129,110 @@ macro_rules! mock_trait {
             ),*
         }
 
-        impl Default for $mock_name {
-            fn default() -> Self {
-                $mock_name {
-                    $(
-                        $method: double::Mock::default()
-                    ),*
-                }
-            }
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        __private_mock_trait_default_impl!($mock_name $(, $method)*);
+    );
+}
+
+/// Macro that generates a `struct` implementation of a trait.
+///
+/// Use this instead of `mock_trait!` if one or more of the return types do not
+/// implement `Default`. If all return types implement `Default`, then it's
+/// more convenient to use `mock_trait!`, since you instantiate mock objects
+/// using `default()`,
+///
+/// This macro generates a `struct` that implements the traits `Clone` and
+/// and `Debug`. Create instances of the mock object by calling `new()`,
+/// passing in the return values for each mocked method using `new()`.
+///
+/// The `struct` has a field for each method of the `trait`, which manages
+/// their respective method's behaviour and call expectations. For example, if
+/// one defines a mock like so:
+//
+/// ```
+/// # #[macro_use] extern crate double;
+///
+/// // `Result` does not implement `Default`.
+/// mock_trait_no_default!(
+///     MockTaskManager,
+///     max_threads(()) -> Result<u32, String>,
+///     set_max_threads(u32) -> ()
+/// );
+///
+/// # fn main() {
+///     // only here to make `cargo test` happy
+/// }
+/// ```
+///
+/// Then the following code is generated:
+///
+/// ```
+/// #[derive(Debug, Clone)]
+/// struct MockTaskManager {
+///     max_threads: double::Mock<(), Result<u32, String>>,
+///     set_max_threads: double::Mock<(u32), ()>,
+/// }
+///
+/// impl MockTaskManager {
+///     pub fn new(max_threads: Result<u32, String>, set_max_threads: ()) -> Self {
+///         MockTaskManager {
+///             max_threads: double::Mock::new(max_threads),
+///             set_max_threads: double::Mock::new(set_max_threads),
+///         }
+///     }
+/// }
+/// ```
+///
+/// Note that just defining this macro is not enough. This macro is used to
+/// generate the necessary boilerplate, but the generated struct *does not*
+/// implement the desired `trait`. To do that, use `double`'s `mock_method`
+/// macro.
+///
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate double;
+///
+/// trait TaskManager {
+///    fn max_threads(&self) -> Result<u32, String>;
+///    fn set_max_threads(&mut self, max_threads: u32);
+/// }
+///
+/// mock_trait_no_default!(
+///     MockTaskManager,
+///     max_threads(()) -> Result<u32, String>,
+///     set_max_threads(u32) -> ()
+/// );
+///
+/// # fn main() {
+/// let mock = MockTaskManager::new(Ok(42), ());
+/// assert_eq!(Ok(42), mock.max_threads.call(()));
+/// mock.set_max_threads.call(9001u32);
+/// assert!(mock.set_max_threads.called_with(9001u32));
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mock_trait_no_default {
+    ($mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
+        #[derive(Debug, Clone)]
+        struct $mock_name {
+            $(
+                $method: double::Mock<(($($arg_type),*)), $retval>
+            ),*
         }
+
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+    );
+
+    (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
+        #[derive(Debug, Clone)]
+        pub struct $mock_name {
+            $(
+                $method: double::Mock<(($($arg_type),*)), $retval>
+            ),*
+        }
+
+        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
     );
 }
 

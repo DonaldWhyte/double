@@ -244,6 +244,43 @@ impl Queue for MockQueue {
 }
 ```
 
+#### Mocking Methods That Return Types Which Do Not Implement `Default`
+
+The `mock_trait!` macro assumes the return types of all the methods in the mocked `trait` implement `Default`. This makes it convenient to construct the mock object. One can invoke `MockTrait::default()` to construct the mock object and auto-configure it return default values for all methods in one go.
+
+If a `trait` provides a method that returns a type that _does not_ implement `Default`, then one must generate the mock using `mock_trait_no_default!`. This macro generates a mock that does not implement `Default`. Clients must construct instances of the generated mock using `MockTrait::new()`, manually specifying the default return values for each method.
+
+For example:
+
+```
+// `Result` does not implement the `Default` trait. Trying to mock `UserStore`
+// using the `mock_trait!` macro will fail. We use `mock_trait_no_default!`
+// instead.
+pub trait UserStore {
+    fn get_username(&self, id: i32) -> Result<String, String>;
+}
+
+mock_trait_no_default!(
+    MockUserStore,
+    get_username(i32) -> Result<String, String>);
+
+impl UserStore for MockUserStore {
+    mock_method!(get_username(&self, id: i32) -> Result<String, String>);
+}
+
+fn test_manually_setting_default_retval() {
+    // GIVEN:
+    // Construct instance of the mock, manually specifying the default
+    // return value for `get_username()`.
+    let mock = MockUserStore::new(
+        Ok("default_user_name".to_owned()));  // get_username() default retval
+    // WHEN:
+    let result = mock.get_username(10001);
+    // THEN:
+    assert_eq!(Ok("default_username".to_owned()), result);
+}
+```
+
 #### Mocking Methods That Take `&str` References
 
 `&str` is a common argument type. However, double does not support mocking methods with `&str` arguments with additional boilerplate.
@@ -270,7 +307,7 @@ impl TextStreamWriter for MockTextStreamWriter {
 }
 ```
 
-The `method_method` variant used above allows you to specify  the body of the generated function manually. The custom body simply converts the `&str` argument to an owned string and passes it into the underlying `write` `Mock` object manually. (normally auto-generated bodies do this for you).
+The `mock_method` variant used above allows you to specify  the body of the generated function manually. The custom body simply converts the `&str` argument to an owned string and passes it into the underlying `write` `Mock` object manually. (normally auto-generated bodies do this for you).
 
 > NOTE: The name of the underlying mock object is always the same as the mocked
 method's name. So in the custom `write` body, you should pass the arguments down to `self.write`.
