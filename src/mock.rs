@@ -475,6 +475,14 @@ impl<C, R> Mock<C, R>
         self.calls.borrow().contains(&args.into())
     }
 
+    // TODO: make private
+    pub fn compute_matches(&self, matcher: &Fn(&C) -> bool) -> Vec<bool> {
+        self.calls.borrow()
+            .iter()
+            .map(matcher)
+            .collect()
+    }
+
     /// Returns true if `Mock::call` has been called with all of the specified
     /// `calls`. The `calls` can be made in any order.
     ///
