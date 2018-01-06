@@ -12,5 +12,6 @@ categories= [
     "development-tools::testing"
 ]
 description="Full-featured mocking library in Rust, including rich failure messages and argument matchers"
+build="build.rs"
 
 [dependencies]

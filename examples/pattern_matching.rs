@@ -16,8 +16,6 @@ impl ProfitForecaster for MockForecaster {
 }
 
 macro_rules! matcher {
-    // TODO: no arg
-
     // TODO: split into separate matchers and add & manually if possible
 
     ( $arg_matchers:tt ) => (
