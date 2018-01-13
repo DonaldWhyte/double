@@ -48,6 +48,6 @@
 
 pub use mock::Mock;
 
-mod macros;
-mod matcher;
-mod mock;
+pub mod macros;
+pub mod matcher;
+pub mod mock;

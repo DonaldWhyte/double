@@ -10,6 +10,17 @@ const MIN_ARGS: usize = 1;
 const MAX_ARGS: usize = 12;
 
 
+macro_rules! matcher {
+    ($m1:expr) => (
+        &|args| -> bool { match_impl_1(args, ($m1)) }
+    );
+    ($m1:expr, $m2:expr) => (
+        &|args| -> bool { match_impl_2(args, ($m1, $m2)) }
+    )
+}
+
+
+
 fn generate_matcher_macro(max_args: usize) -> String {
     assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 
@@ -18,12 +29,26 @@ fn generate_matcher_macro(max_args: usize) -> String {
         |&i| generate_matcher_macro_case_n(i)
     ).collect();
     format!(
-        "macro_rules! matcher {{\n\n{}\n\n}}",
-        macro_cases.join(",\n\n"))
+        "#[macro_export]\nmacro_rules! matcher {{\n{}\n\n}}",
+        macro_cases.join("\n"))
 }
 
 fn generate_matcher_macro_case_n(n_args: usize) -> String {
-    n_args.to_string()
+    let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
+    let case_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$m{}:expr", i.to_string())
+    ).collect();
+    let match_impl_func_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$m{}", i.to_string())
+    ).collect();
+
+    format!("
+    ({}) => (
+        &|args| -> bool {{ match_impl_{}(args, ({})) }}
+    );",
+        case_args.join(", "),
+        n_args.to_string(),
+        match_impl_func_args.join(", "))
 }
 
 fn generate_match_impls(max_args: usize) -> String {
@@ -57,7 +82,7 @@ fn generate_match_impl_n(n_args: usize) -> String {
     // the input arg as a one-tuple and will treat it is a single arg instead.
     if n_args == 1 {
         return "
-fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
+pub fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
     arg_matcher(arg)
 }".to_owned();
     }
@@ -82,10 +107,10 @@ fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
     ).collect();
 
     format!("
-fn match_impl_{}<{}>(args: &(
+pub fn match_impl_{}<{}>(args: &(
         {}
     ),
-    arg_matchers: &(
+    arg_matchers: (
         {}
     )) -> bool {{
     let matches = vec!(
