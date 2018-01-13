@@ -49,4 +49,5 @@
 pub use mock::Mock;
 
 mod macros;
+mod matcher;
 mod mock;

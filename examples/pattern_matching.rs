@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate double;
+use double::matcher::*;
 
 pub trait ProfitForecaster {
     fn profit_at(&self, timestamp: i32) -> f64;
@@ -23,7 +24,7 @@ macro_rules! matcher {
     )
 }
 
-fn match_impl<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
+fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
     arg_matcher(arg)
 }
 
@@ -105,15 +106,13 @@ fn main() {
     forecaster.write_report_for(42, false);
 
     let profit_at_matches = forecaster.profit_at.compute_matches(
-        // matcher!(bind!(equal, 42));
         &|args| -> bool {
-            match_impl(args, &bind!(equal, 42))
+            match_impl_1(args, &bind!(equal, 42))
         }
     );
     println!("profit_at {:?}", profit_at_matches);
 
     let write_report_for_matches = forecaster.write_report_for.compute_matches(
-        // matcher!(bind!(equal, 42));
         &|args| -> bool {
             match_impl2(args, ( &bind!(equal, 42), &bind!(equal, false) ))
         }

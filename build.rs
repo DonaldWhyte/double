@@ -1,75 +1,113 @@
+#[macro_use] extern crate maplit;
+
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-fn generate_matcher_macro(n_args: u32) -> String {
-    assert!(n_args >= 2);
 
-    String result = "macro_rules! matcher {";
-    result
+const MIN_ARGS: usize = 1;
+const MAX_ARGS: usize = 12;
+
+
+fn generate_matcher_macro(max_args: usize) -> String {
+    assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
+
+    let arg_nums: Vec<usize> = (MIN_ARGS..MAX_ARGS).collect();
+    let macro_cases: Vec<String> = arg_nums.iter().map(
+        |&i| generate_matcher_macro_case_n(i)
+    ).collect();
+    format!(
+        "macro_rules! matcher {{\n\n{}\n\n}}",
+        macro_cases.join(",\n\n"))
 }
 
-fn generate_matcher_macro_case_n(n: u32) -> String {
-
+fn generate_matcher_macro_case_n(n_args: usize) -> String {
+    n_args.to_string()
 }
 
-fn generate_match_impl_n(n: u32) -> String {
-    assert!(n_args >= 2);
+fn generate_match_impls(max_args: usize) -> String {
+    assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 
-    let type_param_names = range(n).iter().map().collect().join(",");
+    let arg_nums: Vec<usize> = (MIN_ARGS..MAX_ARGS).collect();
+    let match_impls: Vec<String> = arg_nums.iter().map(
+        |&i| generate_match_impl_n(i)
+    ).collect();
+    match_impls.join("\n")
+}
 
-    String result = "fn match_impl_" + n.to_string() + "<";
-    result.push_str(type_param_names.join(","));
-    result.push_str(">");
-    result.push_str("(args: &()");
-    result.push_str(type_param_names.join(","));
-    result.push_str(")");
+fn generate_match_impl_n(n_args: usize) -> String {
+    let arg_num_to_generic_type = hashmap!(
+        0usize => "A",
+        1usize => "B",
+        2usize => "C",
+        3usize => "D",
+        4usize => "E",
+        5usize => "F",
+        6usize => "G",
+        7usize => "H",
+        8usize => "I",
+        9usize => "J",
+        10usize => "K",
+        11usize => "J"
+    );
+    assert!(arg_num_to_generic_type.len() == MAX_ARGS);
 
-    result.push_str("{\n");
-    result.push_str("    let matches = vec!(");
-    for i in 0..n {
-        let i_str = i.to_string();
-        result.push_str(
-            "        arg_matchers." + i_str + "(&args." + i_str + "),");
+    // We need a special case for one argument. The rust compile won't treat
+    // the input arg as a one-tuple and will treat it is a single arg instead.
+    if n_args == 1 {
+        return "
+fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
+    arg_matcher(arg)
+}".to_owned();
     }
-    result.push_str("    );");
-    result.push_str("!matches.iter().any(|is_match| !is_match)");
-    result.push_str("}\n");
-    result
-}
 
-fn match_impl2<A, B>(
-    args: &(
-        A,
-        B,
+    let arg_number_range: Vec<usize> = (0..n_args).collect();
+    let type_param_names: Vec<String> = arg_number_range.iter().map(
+        |&i| arg_num_to_generic_type.get(&i)
+            .expect("not enough num -> type name mappings")
+            .to_owned()
+            .to_owned()
+    ).collect();
+
+    let matcher_params: Vec<String> = type_param_names.iter().map(
+        |ref t| format!("&Fn(&{}) -> bool", t)
+    ).collect();
+
+    let matcher_invocations: Vec<String> = arg_number_range.iter().map(
+        |&i| format!(
+            "arg_matchers.{}(&args.{})",
+            i.to_string(),
+            i.to_string())
+    ).collect();
+
+    format!("
+fn match_impl_{}<{}>(args: &(
+        {}
     ),
-    arg_matchers: (
-        &Fn(&A) -> bool,
-        &Fn(&B) -> bool,
-    )) -> bool
-{
+    arg_matchers: &(
+        {}
+    )) -> bool {{
     let matches = vec!(
-        arg_matchers.0(&args.0),
-        arg_matchers.1(&args.1),
+        {}
     );
     !matches.iter().any(|is_match| !is_match)
+}}",
+        n_args.to_string(),
+        type_param_names.join(","),
+        type_param_names.join(",\n        "),
+        matcher_params.join(",\n        "),
+        matcher_invocations.join(",\n        "))
 }
 
-
-
-
 fn main() {
+    let file_contents = format!(
+        "{}\n\n{}\n",
+        generate_matcher_macro(MAX_ARGS),
+        generate_match_impls(MAX_ARGS));
+
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("matcher_generated.rs");
     let mut f = File::create(&dest_path).unwrap();
-
-    f.write_all(b"
-macro_rules! matcher {
-    // TODO
-}
-        pub fn message() -> &'static str {
-            \"Hello, World!\"
-        }
-    ").unwrap();
+    f.write_all(file_contents.as_bytes()).unwrap();
 }

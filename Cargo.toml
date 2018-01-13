@@ -14,4 +14,5 @@ categories= [
 description="Full-featured mocking library in Rust, including rich failure messages and argument matchers"
 build="build.rs"
 
-[dependencies]
+[build-dependencies]
+maplit = "1.0.1"
