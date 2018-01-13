@@ -1,12 +1,83 @@
+extern crate lazysort;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
+use std::iter::FromIterator;
 use std::rc::Rc;
+use self::lazysort::SortedBy;
 
 type Ref<T> = Rc<RefCell<T>>;
 type OptionalRef<T> = Rc<RefCell<Option<T>>>;
+
+#[derive(Default)]
+struct MatchInfo {
+    // Tuple in below vector contains: (expectation_index, matching_all_index)
+    expectation_to_matching_call: Vec<(usize, usize)>,
+    unmatched_expectation_indices: HashSet<usize>,
+    expectation_count: usize,
+    actual_num_calls: usize,
+}
+
+impl MatchInfo {
+
+    pub fn expectations_matched(&self) -> bool {
+        self.unmatched_expectation_indices.len() == 0
+    }
+
+    pub fn expectations_matched_in_order(&self) -> bool {
+        self.expectations_matched() && self.matches_are_in_order()
+    }
+
+    pub fn expectations_matched_exactly(&self) -> bool {
+        self.expectations_matched() &&
+            self.num_expectations_equal_num_actual_calls()
+    }
+
+    pub fn expectations_matched_in_order_exactly(&self) -> bool {
+        self.expectations_matched_in_order() &&
+            self.num_expectations_equal_num_actual_calls()
+    }
+
+    fn matches_are_in_order(&self) -> bool {
+        if self.expectations_matched() {
+            // Sort the matched pairs from first call index to last
+            let sorted_match_pairs: Vec<(usize, usize)> =
+                self.expectation_to_matching_call
+                    .iter()
+                    .sorted_by(|a, b| {a.1.cmp(&b.1)})
+                    .map(|pair| pair.clone())
+                    .collect();
+            for window in sorted_match_pairs.as_slice().windows(2) {
+                let prev_exp_index = window[0].0;
+                let curr_exp_index = window[1].0;
+                if prev_exp_index > curr_exp_index {  // TODO: should be >=?
+                    return false
+                }
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
+    fn num_expectations_equal_num_actual_calls(&self) -> bool {
+        if self.expectation_count != self.actual_num_calls {
+            println!(
+                "Mock was called {:?} times, not {:?}",
+                self.actual_num_calls,
+                self.expectation_count);
+            false
+        } else {
+            true
+        }
+    }
+
+}
 
 /// Used for tracking function call arguments and specifying a predetermined
 /// return value or mock function.
@@ -426,7 +497,6 @@ impl<C, R> Mock<C, R>
     }
 }
 
-// TODO: only implement this if there is a `Default` impl in R?
 impl<C, R> Default for Mock<C, R>
     where C: Clone + Eq + Hash,
           R: Clone + Default
@@ -456,6 +526,10 @@ impl<C, R> Mock<C, R>
     where C: Clone + Debug + Eq + Hash,
           R: Clone
 {
+    // ========================================================================
+    // * Exact Argument Checks
+    // ========================================================================
+
     /// Returns true if the specified argument has been used for `Mock::call`.
     ///
     /// # Examples
@@ -472,15 +546,8 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.called_with("baz"));
     /// ```
     pub fn called_with<T: Into<C>>(&self, args: T) -> bool {
-        self.calls.borrow().contains(&args.into())
-    }
-
-    // TODO: make private
-    pub fn compute_matches(&self, matcher: &Fn(&C) -> bool) -> Vec<bool> {
-        self.calls.borrow()
-            .iter()
-            .map(matcher)
-            .collect()
+        let expected_calls: Vec<T> = vec!(args);
+        self.get_match_info(expected_calls).expectations_matched()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
@@ -507,9 +574,7 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.has_calls(expected_calls5));
     /// ```
     pub fn has_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        let num_expected = expected_calls.len();
-        let matches = self.match_calls(expected_calls);
-        matches.len() == num_expected
+        self.get_match_info(expected_calls).expectations_matched()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
@@ -535,22 +600,7 @@ impl<C, R> Mock<C, R>
     /// assert!(mock.has_calls(expected_calls4));
     /// ```
     pub fn has_calls_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        let num_expected = expected_calls.len();
-        let matches = self.match_calls(expected_calls);
-        if matches.len() != num_expected {
-            false
-        } else {
-            let match_indices: Vec<usize> = matches
-                .iter()
-                .map(|r| r.1.clone())
-                .collect();
-            for window in match_indices.as_slice().windows(2) {
-                if window[0] >= window[1] {
-                    return false
-                }
-            }
-            true
-        }
+        self.get_match_info(expected_calls).expectations_matched_in_order()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
@@ -575,19 +625,7 @@ impl<C, R> Mock<C, R>
     /// let expected_calls4 = vec!("bar");
     /// assert!(!mock.has_calls_exactly(expected_calls4));
     pub fn has_calls_exactly<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        let num_expected = expected_calls.len();
-        let has_calls = self.has_calls(expected_calls);
-
-        let actual_num_calls = self.calls.borrow().len();
-        if actual_num_calls > num_expected {
-            println!(
-                "Mock was called {:?} times, not {:?}",
-                actual_num_calls,
-                num_expected);
-            return false
-        }
-
-        has_calls
+        self.get_match_info(expected_calls).expectations_matched_exactly()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
@@ -612,49 +650,152 @@ impl<C, R> Mock<C, R>
     /// let expected_calls4 = vec!("bar");
     /// assert!(!mock.has_calls_exactly_in_order(expected_calls4));
     pub fn has_calls_exactly_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        let num_expected = expected_calls.len();
-        let has_calls = self.has_calls_in_order(expected_calls);
-
-        let actual_num_calls = self.calls.borrow().len();
-        if actual_num_calls > num_expected {
-            println!(
-                "Mock was called {:?} times, not {:?}",
-                actual_num_calls,
-                num_expected);
-            return false
-        }
-
-        has_calls
+        self.get_match_info(expected_calls).expectations_matched_in_order_exactly()
     }
 
-    fn match_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> Vec<(C, usize)> {
+    // ========================================================================
+    // * Pattern Matching Argument Checks
+    // ========================================================================
+
+    // There are apparently plans for the Rust compiler to support associated
+    // types in concrete `impl`s. This would allow the matcher function
+    // signature to be aliased, like below:
+    //
+    // type Matcher = Fn(&C) -> bool;
+    //
+    // TODO: define the above type alias when possible and use that instead of
+    // explicitly defining the function signature everywhere.
+
+    /// Returns true if an argument set passed into `Mock::call` matches the
+    /// specified `pattern`.
+    ///
+    /// TODO: explain what pattern is, or link to a place that does
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    ///
+    /// let pattern1 = |args: &(i32, i32)| args.0 == 42 && args.1 != 0;
+    /// let pattern2 = |args: &(i32, i32)| args.0 == 42 && args.1 == 0;
+    /// let pattern3 = |args: &(i32, i32)| args.0 == 84;
+    ///
+    /// assert!(mock.called_with_pattern(&pattern1));
+    /// assert!(mock.called_with_pattern(&pattern2));
+    /// assert!(!mock.called_with_pattern(&pattern3));
+    /// ```
+    pub fn called_with_pattern(&self, pattern: &Fn(&C) -> bool) -> bool {
+        let patterns: Vec<&Fn(&C) -> bool> = vec!(pattern);
+        self.get_match_info_pat(patterns).expectations_matched()
+    }
+
+    // TODO: document and test these
+
+    pub fn has_patterns(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+        self.get_match_info_pat(patterns).expectations_matched()
+    }
+
+    pub fn has_patterns_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+        self.get_match_info_pat(patterns).expectations_matched_in_order()
+    }
+
+    pub fn has_patterns_exactly(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+        self.get_match_info_pat(patterns).expectations_matched_exactly()
+    }
+
+    pub fn has_patterns_exactly_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+        self.get_match_info_pat(patterns).expectations_matched_in_order_exactly()
+    }
+
+    // ========================================================================
+    // * Private Helpers
+    // ========================================================================
+    fn get_match_info<T: Into<C>>(&self, expected_calls: Vec<T>) -> MatchInfo {
+        // TODO: explain
         let expected_calls_c: Vec<C> = expected_calls
             .into_iter()
             .map(|r| r.into())
             .collect();
 
-        let mut matches: Vec<(C, usize)> = vec!();
-        for call in self.calls.borrow().iter() {
-            match expected_calls_c.iter().position(|r| call == r)
-            {
-                Some(index) => {
-                    matches.push((call.clone(), index));
-                },
-                None => {
+        // TODO: explain this
+        let mut expectation_to_matching_call: Vec<(usize, usize)> = vec!();
+        for (expected_index, expected_args) in expected_calls_c.iter().enumerate() {
+            for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
+                if call_args == expected_args {
+                    expectation_to_matching_call.push((expected_index, call_index));
                 }
             }
         }
 
-        {
-            let matches_c: Vec<C> = matches.iter().map(|r| r.0.clone()).collect();
-            let missing = expected_calls_c.iter().filter(
-                |call| !matches_c.contains(call));
-            for missing_call in missing {
-                println!("Expected call missing: {:?}", missing_call);
+        let expected_indices: HashSet<usize> = HashSet::from_iter(
+            expected_calls_c
+            .iter()
+            .enumerate()
+            .map(|x| x.0));
+        let expected_indices_matched: HashSet<usize> = HashSet::from_iter(
+            expectation_to_matching_call
+            .iter()
+            .map(|x| x.0));
+        let unmatched_expectation_indices = HashSet::from_iter(
+            expected_indices
+            .difference(&expected_indices_matched)
+            .map(|i| i.clone()));
+        for index in unmatched_expectation_indices.iter() {
+            println!(
+                "No match found for expected call/pattern with index {}",
+                index);
+        }
+
+        MatchInfo {
+            expectation_to_matching_call: expectation_to_matching_call,
+            unmatched_expectation_indices: unmatched_expectation_indices,
+            expectation_count: expected_calls_c.len(),
+            actual_num_calls: self.calls.borrow().len(),
+        }
+    }
+
+    fn get_match_info_pat(&self, patterns: Vec<&Fn(&C) -> bool>) -> MatchInfo {
+        // TODO: factor common logic out
+
+        // TODO: explain this
+        let mut expectation_to_matching_call: Vec<(usize, usize)> = vec!();
+        for (expected_index, pattern_fn) in patterns.iter().enumerate() {
+            for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
+                if pattern_fn(call_args) {
+                    expectation_to_matching_call.push((expected_index, call_index));
+                }
             }
         }
 
-        matches
+        let expected_indices: HashSet<usize> = HashSet::from_iter(
+            patterns
+            .iter()
+            .enumerate()
+            .map(|x| x.0));
+        let expected_indices_matched: HashSet<usize> = HashSet::from_iter(
+            expectation_to_matching_call
+            .iter()
+            .map(|x| x.0));
+        let unmatched_expectation_indices = HashSet::from_iter(
+            expected_indices
+            .difference(&expected_indices_matched)
+            .map(|i| i.clone()));
+        for index in unmatched_expectation_indices.iter() {
+            println!(
+                "No match found for expected call/pattern with index {}",
+                index);
+        }
+
+        MatchInfo {
+            expectation_to_matching_call: expectation_to_matching_call,
+            unmatched_expectation_indices: unmatched_expectation_indices,
+            expectation_count: patterns.len(),
+            actual_num_calls: self.calls.borrow().len(),
+        }
     }
 }
 

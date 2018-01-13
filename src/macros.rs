@@ -20,6 +20,7 @@ macro_rules! __private_mock_trait_default_impl {
 macro_rules! __private_mock_trait_new_impl {
     ($mock_name:ident $(, $method:ident: $retval: ty)*) => (
         impl $mock_name {
+            #[allow(dead_code)]
             pub fn new( $($method: $retval),* ) -> Self {
                 Self {
                     $( $method: double::Mock::new($method) ),*
