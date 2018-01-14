@@ -25,14 +25,20 @@ fn main() {
     forecaster.write_report_for(42, false);
 
     let profit_at_matches = forecaster.profit_at.called_with_pattern(
-        matcher!(&mb!(equal, 42))
+        matcher!(&arg!(equal, 42))
     );
     println!("profit_at {:?}", profit_at_matches);
 
     let write_report_for_matches = forecaster.write_report_for.called_with_pattern(
-        matcher!(&mb!(equal, 42), &mb!(equal, false) )
+        matcher!(&arg!(equal, 42), &arg!(equal, false) )
     );
     println!("write_report_for {:?}", write_report_for_matches);
+
+    let write_report_for_matches_all = forecaster.write_report_for.has_patterns(vec!(
+        matcher!(&arg!(equal, 42), &arg!(equal, true) ),
+        matcher!(&arg!(equal, 42), &arg!(equal, false) )
+    ));
+    println!("write_report_for matches all: {:?}", write_report_for_matches_all);
 
     // TODO: add tests for all pattern checking variants
 }

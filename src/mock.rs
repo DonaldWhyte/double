@@ -13,72 +13,6 @@ use self::lazysort::SortedBy;
 type Ref<T> = Rc<RefCell<T>>;
 type OptionalRef<T> = Rc<RefCell<Option<T>>>;
 
-#[derive(Default)]
-struct MatchInfo {
-    // Tuple in below vector contains: (expectation_index, matching_all_index)
-    expectation_to_matching_call: Vec<(usize, usize)>,
-    unmatched_expectation_indices: HashSet<usize>,
-    expectation_count: usize,
-    actual_num_calls: usize,
-}
-
-impl MatchInfo {
-
-    pub fn expectations_matched(&self) -> bool {
-        self.unmatched_expectation_indices.len() == 0
-    }
-
-    pub fn expectations_matched_in_order(&self) -> bool {
-        self.expectations_matched() && self.matches_are_in_order()
-    }
-
-    pub fn expectations_matched_exactly(&self) -> bool {
-        self.expectations_matched() &&
-            self.num_expectations_equal_num_actual_calls()
-    }
-
-    pub fn expectations_matched_in_order_exactly(&self) -> bool {
-        self.expectations_matched_in_order() &&
-            self.num_expectations_equal_num_actual_calls()
-    }
-
-    fn matches_are_in_order(&self) -> bool {
-        if self.expectations_matched() {
-            // Sort the matched pairs from first call index to last
-            let sorted_match_pairs: Vec<(usize, usize)> =
-                self.expectation_to_matching_call
-                    .iter()
-                    .sorted_by(|a, b| {a.1.cmp(&b.1)})
-                    .map(|pair| pair.clone())
-                    .collect();
-            for window in sorted_match_pairs.as_slice().windows(2) {
-                let prev_exp_index = window[0].0;
-                let curr_exp_index = window[1].0;
-                if prev_exp_index > curr_exp_index {  // TODO: should be >=?
-                    return false
-                }
-            }
-
-            true
-        } else {
-            false
-        }
-    }
-
-    fn num_expectations_equal_num_actual_calls(&self) -> bool {
-        if self.expectation_count != self.actual_num_calls {
-            println!(
-                "Mock was called {:?} times, not {:?}",
-                self.actual_num_calls,
-                self.expectation_count);
-            false
-        } else {
-            true
-        }
-    }
-
-}
-
 /// Used for tracking function call arguments and specifying a predetermined
 /// return value or mock function.
 ///
@@ -183,8 +117,8 @@ impl<C, R> Mock<C, R>
         } else if let Some(ref default_closure) = *self.default_closure.borrow() {
             return default_closure(args);
         } else {
-            // TODO: error if a retval sequence was specified but there's no
-            // more values left?
+            // If there are no return values in the value sequence left, fall
+            // back to the configured default value.
             let ref mut sequence = *self.return_value_sequence.borrow_mut();
             match sequence.pop() {
                 Some(return_value) => return_value,
@@ -551,7 +485,8 @@ impl<C, R> Mock<C, R>
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
-    /// `calls`. The `calls` can be made in any order.
+    /// `calls`. The calls can be made in any order.  They don't have to be in
+    /// the order specified by `calls`.
     ///
     /// # Examples
     ///
@@ -573,8 +508,8 @@ impl<C, R> Mock<C, R>
     /// let expected_calls5 = vec!("foo", "not_in_calls");
     /// assert!(!mock.has_calls(expected_calls5));
     /// ```
-    pub fn has_calls<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        self.get_match_info(expected_calls).expectations_matched()
+    pub fn has_calls<T: Into<C>>(&self, calls: Vec<T>) -> bool {
+        self.get_match_info(calls).expectations_matched()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
@@ -586,51 +521,55 @@ impl<C, R> Mock<C, R>
     /// ```
     /// use double::Mock;
     ///
-    /// let mock = Mock::<&str, ()>::new(());
-    /// mock.call("foo");
-    /// mock.call("bar");
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    /// mock.call((42, 0));  // called with same args as first call!
     ///
-    /// let expected_calls1 = vec!("foo", "bar");
-    /// assert!(mock.has_calls_in_order(expected_calls1));
-    /// let expected_calls2 = vec!("bar", "foo");
-    /// assert!(!mock.has_calls_in_order(expected_calls2));
-    /// let expected_calls3 = vec!("foo");
-    /// assert!(mock.has_calls(expected_calls3));
-    /// let expected_calls4 = vec!("bar");
-    /// assert!(mock.has_calls(expected_calls4));
+    /// assert!(mock.has_calls_in_order(vec!( (42, 0) )));
+    /// assert!(mock.has_calls_in_order(vec!( (42, 1) )));
+    /// assert!(mock.has_calls_in_order(vec!( (42, 0), (42, 1) )));
+    /// assert!(mock.has_calls_in_order(vec!( (42, 1), (42, 0) )));
+    /// assert!(mock.has_calls_in_order(vec!( (42, 0), (42, 1), (42, 0) )));
+    /// assert!(!mock.has_calls_in_order(vec!( (42, 0), (42, 0), (42, 1) )));
+    /// assert!(!mock.has_calls_in_order(vec!( (84, 0) )));
+    /// assert!(!mock.has_calls_in_order(vec!( (42, 0), (84, 0) )));
     /// ```
-    pub fn has_calls_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        self.get_match_info(expected_calls).expectations_matched_in_order()
+    pub fn has_calls_in_order<T: Into<C>>(&self, calls: Vec<T>) -> bool {
+        self.get_match_info(calls).expectations_matched_in_order()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
-    /// `calls` and it has not been called any other times. The `calls` can be
-    /// made in any order.
+    /// `calls` and it has not been called any other times. The calls can be
+    /// made in any order. They don't have to be in the order specified by
+    /// `calls`.
     ///
     /// # Examples
     ///
     /// ```
     /// use double::Mock;
     ///
-    /// let mock = Mock::<&str, ()>::new(());
-    /// mock.call("foo");
-    /// mock.call("bar");
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    /// mock.call((42, 0));
     ///
-    /// let expected_calls1 = vec!("foo", "bar");
-    /// assert!(mock.has_calls_exactly(expected_calls1));
-    /// let expected_calls2 = vec!("bar", "foo");
-    /// assert!(mock.has_calls_exactly(expected_calls2));
-    /// let expected_calls3 = vec!("foo");
-    /// assert!(!mock.has_calls_exactly(expected_calls3));
-    /// let expected_calls4 = vec!("bar");
-    /// assert!(!mock.has_calls_exactly(expected_calls4));
-    pub fn has_calls_exactly<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        self.get_match_info(expected_calls).expectations_matched_exactly()
+    /// assert!(!mock.has_calls_exactly(vec!( (42, 0) )));
+    /// assert!(!mock.has_calls_exactly(vec!( (42, 1) )));
+    /// assert!(!mock.has_calls_exactly(vec!( (84, 0) )));
+    /// assert!(!mock.has_calls_exactly(vec!( (42, 0), (42, 1) )));
+    /// assert!(!mock.has_calls_exactly(vec!( (42, 1), (42, 0) )));
+    /// assert!(mock.has_calls_exactly(vec!( (42, 0), (42, 0), (42, 1) )));
+    /// assert!(mock.has_calls_exactly(vec!( (42, 0), (42, 1), (42, 0) )));
+    /// assert!(!mock.has_calls_exactly(vec!( (42, 0), (42, 1), (84, 0) )));
+    /// ```
+    pub fn has_calls_exactly<T: Into<C>>(&self, calls: Vec<T>) -> bool {
+        self.get_match_info(calls).expectations_matched_exactly()
     }
 
     /// Returns true if `Mock::call` has been called with all of the specified
-    /// `calls` and it has not been called any other times. The `calls` must be
-    /// made in the order they are specified in the vector.
+    /// `calls` and it has not been called any other times. The calls must be
+    /// made in the order they are specified in `calls`.
     ///
     /// # Examples
     ///
@@ -649,8 +588,8 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.has_calls_exactly_in_order(expected_calls3));
     /// let expected_calls4 = vec!("bar");
     /// assert!(!mock.has_calls_exactly_in_order(expected_calls4));
-    pub fn has_calls_exactly_in_order<T: Into<C>>(&self, expected_calls: Vec<T>) -> bool {
-        self.get_match_info(expected_calls).expectations_matched_in_order_exactly()
+    pub fn has_calls_exactly_in_order<T: Into<C>>(&self, calls: Vec<T>) -> bool {
+        self.get_match_info(calls).expectations_matched_in_order_exactly()
     }
 
     // ========================================================================
@@ -693,20 +632,125 @@ impl<C, R> Mock<C, R>
         self.get_match_info_pat(patterns).expectations_matched()
     }
 
-    // TODO: document and test these
-
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `patterns`. The calls can be made in any order. They don't have to be
+    /// in the order specified by `patterns`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    ///
+    /// let pattern1 = |args: &(i32, i32)| args.0 == 42 && args.1 != 0;
+    /// let pattern2 = |args: &(i32, i32)| args.0 == 42 && args.1 == 0;
+    /// let pattern3 = |args: &(i32, i32)| args.0 == 84;
+    ///
+    /// assert!(mock.has_patterns(vec!(&pattern1)));
+    /// assert!(mock.has_patterns(vec!(&pattern2)));
+    /// assert!(mock.has_patterns(vec!(&pattern1, &pattern2)));
+    /// assert!(mock.has_patterns(vec!(&pattern2, &pattern1)));
+    /// assert!(!mock.has_patterns(vec!(&pattern3)));
+    /// assert!(!mock.has_patterns(vec!(&pattern1, &pattern3)));
+    /// ```
     pub fn has_patterns(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
         self.get_match_info_pat(patterns).expectations_matched()
     }
 
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `patterns`. The `patterns` must be made in the order they are specified
+    /// in the input vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    /// mock.call((42, 0));  // called with same args as first call!
+    ///
+    /// let pattern1 = |args: &(i32, i32)| args.0 == 42 && args.1 != 0;
+    /// let pattern2 = |args: &(i32, i32)| args.0 == 42 && args.1 == 0;
+    /// let pattern3 = |args: &(i32, i32)| args.0 == 84;
+    ///
+    /// assert!(mock.has_patterns_in_order(vec!(&pattern1)));
+    /// assert!(mock.has_patterns_in_order(vec!(&pattern2)));
+    /// assert!(mock.has_patterns_in_order(vec!(&pattern1, &pattern2)));
+    /// assert!(mock.has_patterns_in_order(vec!(&pattern2, &pattern1)));
+    /// assert!(mock.has_patterns_in_order(vec!(&pattern1, &pattern2, &pattern1)));
+    /// assert!(!mock.has_patterns_in_order(vec!(&pattern1, &pattern1, &pattern2)));
+    /// assert!(!mock.has_patterns_in_order(vec!(&pattern3)));
+    /// assert!(!mock.has_patterns_in_order(vec!(&pattern1, &pattern3)));
+    /// ```
     pub fn has_patterns_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
         self.get_match_info_pat(patterns).expectations_matched_in_order()
     }
 
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `patterns` and it has not been called any other times. The calls can be
+    /// made in any order. They don't have to be in the order specified by
+    /// `patterns`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    /// mock.call((42, 0));
+    ///
+    /// let pattern1 = |args: &(i32, i32)| args.0 == 42 && args.1 != 0;
+    /// let pattern2 = |args: &(i32, i32)| args.0 == 42 && args.1 == 0;
+    /// let pattern3 = |args: &(i32, i32)| args.0 == 84;
+    ///
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern2)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern3)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern2)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern2, &pattern1)));
+    /// assert!(mock.has_patterns_exactly(vec!(&pattern1, &pattern1, &pattern2)));
+    /// assert!(mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern1)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern3)));
+    /// ```
     pub fn has_patterns_exactly(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
         self.get_match_info_pat(patterns).expectations_matched_exactly()
     }
 
+    /// Returns true if `Mock::call` has been called with all of the specified
+    /// `patterns` and it has not been called any other times. The calls must
+    /// be made match the patterns in the same order as specified in the
+    /// `patterns` vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use double::Mock;
+    ///
+    /// let mock = Mock::<(i32, i32), ()>::new(());
+    /// mock.call((42, 0));
+    /// mock.call((42, 1));
+    /// mock.call((42, 0));
+    ///
+    /// let pattern1 = |args: &(i32, i32)| args.0 == 42 && args.1 != 0;
+    /// let pattern2 = |args: &(i32, i32)| args.0 == 42 && args.1 == 0;
+    /// let pattern3 = |args: &(i32, i32)| args.0 == 84;
+    ///
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern2)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern3)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern2)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern2, &pattern1)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern1, &pattern2)));
+    /// assert!(mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern1)));
+    /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern3)));
+    /// ```
     pub fn has_patterns_exactly_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
         self.get_match_info_pat(patterns).expectations_matched_in_order_exactly()
     }
@@ -722,79 +766,44 @@ impl<C, R> Mock<C, R>
             .collect();
 
         // TODO: explain this
-        let mut expectation_to_matching_call: Vec<(usize, usize)> = vec!();
+        let mut expectation_to_matching_calls: HashMap<usize, Vec<usize>> =
+            HashMap::new();
         for (expected_index, expected_args) in expected_calls_c.iter().enumerate() {
             for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
                 if call_args == expected_args {
-                    expectation_to_matching_call.push((expected_index, call_index));
+                    expectation_to_matching_calls
+                        .entry(expected_index)
+                        .or_insert(vec!())
+                        .push(call_index);
                 }
             }
         }
 
-        let expected_indices: HashSet<usize> = HashSet::from_iter(
-            expected_calls_c
-            .iter()
-            .enumerate()
-            .map(|x| x.0));
-        let expected_indices_matched: HashSet<usize> = HashSet::from_iter(
-            expectation_to_matching_call
-            .iter()
-            .map(|x| x.0));
-        let unmatched_expectation_indices = HashSet::from_iter(
-            expected_indices
-            .difference(&expected_indices_matched)
-            .map(|i| i.clone()));
-        for index in unmatched_expectation_indices.iter() {
-            println!(
-                "No match found for expected call/pattern with index {}",
-                index);
-        }
-
         MatchInfo {
-            expectation_to_matching_call: expectation_to_matching_call,
-            unmatched_expectation_indices: unmatched_expectation_indices,
-            expectation_count: expected_calls_c.len(),
-            actual_num_calls: self.calls.borrow().len(),
+            num_expectations: expected_calls_c.len(),
+            num_actual_calls: self.calls.borrow().len(),
+            expectation_to_matching_calls: expectation_to_matching_calls,
         }
     }
 
     fn get_match_info_pat(&self, patterns: Vec<&Fn(&C) -> bool>) -> MatchInfo {
-        // TODO: factor common logic out
-
-        // TODO: explain this
-        let mut expectation_to_matching_call: Vec<(usize, usize)> = vec!();
+        let mut expectation_to_matching_calls: HashMap<usize, Vec<usize>> =
+            HashMap::new();
         for (expected_index, pattern_fn) in patterns.iter().enumerate() {
             for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
                 if pattern_fn(call_args) {
-                    expectation_to_matching_call.push((expected_index, call_index));
+                    expectation_to_matching_calls
+                        .entry(expected_index)
+                        .or_insert(vec!())
+                        .push(call_index);
                 }
             }
         }
 
-        let expected_indices: HashSet<usize> = HashSet::from_iter(
-            patterns
-            .iter()
-            .enumerate()
-            .map(|x| x.0));
-        let expected_indices_matched: HashSet<usize> = HashSet::from_iter(
-            expectation_to_matching_call
-            .iter()
-            .map(|x| x.0));
-        let unmatched_expectation_indices = HashSet::from_iter(
-            expected_indices
-            .difference(&expected_indices_matched)
-            .map(|i| i.clone()));
-        for index in unmatched_expectation_indices.iter() {
-            println!(
-                "No match found for expected call/pattern with index {}",
-                index);
-        }
-
         MatchInfo {
-            expectation_to_matching_call: expectation_to_matching_call,
-            unmatched_expectation_indices: unmatched_expectation_indices,
-            expectation_count: patterns.len(),
-            actual_num_calls: self.calls.borrow().len(),
+            num_expectations: patterns.len(),
+            num_actual_calls: self.calls.borrow().len(),
+            expectation_to_matching_calls: expectation_to_matching_calls,
         }
     }
 }
@@ -886,4 +895,103 @@ impl<C, R> Debug for Mock<C, R>
             .field("calls", &self.calls)
             .finish()
     }
+}
+
+struct MatchInfo {
+    num_expectations: usize,
+    num_actual_calls: usize,
+    // Maps pattern index to list of call indices that the pattern matches
+    expectation_to_matching_calls: HashMap<usize, Vec<usize>>,
+}
+
+impl MatchInfo {
+
+    pub fn expectations_matched(&self) -> bool {
+        let expected_indices: HashSet<usize> = HashSet::from_iter(
+            (0..self.num_expectations));
+        let expected_indices_matched: HashSet<usize> = HashSet::from_iter(
+            self.expectation_to_matching_calls
+            .iter()
+            .map(|x| x.0.clone()));
+        let unmatched_expectation_indices: HashSet<usize> = HashSet::from_iter(
+            expected_indices
+            .difference(&expected_indices_matched)
+            .map(|i| i.clone()));
+        for index in unmatched_expectation_indices.iter() {
+            println!(
+                "No match found for expected call/pattern with index {}",
+                index);
+        }
+        unmatched_expectation_indices.len() == 0
+    }
+
+    pub fn expectations_matched_in_order(&self) -> bool {
+        self.expectations_matched() && self.matches_are_in_order()
+    }
+
+    pub fn expectations_matched_exactly(&self) -> bool {
+        self.expectations_matched() &&
+            self.num_expectations_equal_num_actual_calls()
+    }
+
+    pub fn expectations_matched_in_order_exactly(&self) -> bool {
+        self.expectations_matched_in_order() &&
+            self.num_expectations_equal_num_actual_calls()
+    }
+
+    fn matches_are_in_order(&self) -> bool {
+        /*
+        println!("matches_are_in_order");
+        if self.expectations_matched() {
+            // TODO: explain algo if works
+            let sorted_by_pattern_index: Vec<(usize, Vec<usize>)> =
+                self.expectation_to_matching_calls
+                .iter()
+                .map(|(pattern_index, matched_calls)| {
+                    (pattern_index.clone(), matched_calls.clone())
+                })
+                .sorted_by(|a, b| a.0.cmp(&b.0))
+                .collect();
+            for window in sorted_by_pattern_index.as_slice().windows(2) {
+                let ref prev_call_indices = window[0].1;
+                let ref next_call_indices = window[1].1;
+                println!(
+                    "\tprev_call_indices={:?}, next_call_indices={:?}",
+                    prev_call_indices, next_call_indices);
+                let mut found_next_in_sequence = false;
+                for prev_index in prev_call_indices.into_iter() {
+                    for next_index in next_call_indices.into_iter() {
+                        println!(
+                            "\t\tprev_index={}, next_index={}", prev_index, next_index);
+                        if next_index > prev_index {
+                            println!("\t\tfound_next_in_sequence!");
+                            found_next_in_sequence = true;
+                            break;
+                        }
+                    }
+                    if !found_next_in_sequence {
+                        return false;
+                    }
+                }
+            }
+
+            true
+        } else {
+            false
+        }*/
+        false
+    }
+
+    fn num_expectations_equal_num_actual_calls(&self) -> bool {
+        if self.num_expectations != self.num_actual_calls {
+            println!(
+                "Mock was called {:?} times, not {:?}",
+                self.num_actual_calls,
+                self.num_expectations);
+            false
+        } else {
+            true
+        }
+    }
+
 }

@@ -2,7 +2,7 @@ include!(concat!(env!("OUT_DIR"), "/matcher_generated.rs"));
 
 // TODO: better name and document purpose
 #[macro_export]
-macro_rules! mb {
+macro_rules! arg {
     ( $func:ident ) => (
         |&potential_match| -> bool { $func(&potential_match) }
     );
