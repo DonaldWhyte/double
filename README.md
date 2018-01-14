@@ -222,6 +222,10 @@ To ensure individual tests are as isolated (thus, less likely to have bugs) as p
 
 Nevertheless, there might a some case where reusing the same mock and its return values results in easier to read and more maintainable test code. In those cases, `reset_calls()` can be used to clear calls from previous tests.
 
+### Pattern Matching
+
+TODO
+
 ### Other Use Cases
 
 #### Mocking Methods without a Return Value
