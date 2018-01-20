@@ -1,4 +1,12 @@
+extern crate float_cmp;
+
+use std::f32;
+use std::f64;
+use self::float_cmp::ApproxEqUlps;
+
+
 include!(concat!(env!("OUT_DIR"), "/matcher_generated.rs"));
+
 
 /// Macro for conviniently binding matcher parameters to pattern matching
 /// functions.
@@ -152,35 +160,45 @@ pub fn is_err<T, U>(arg: &Result<T, U>, pattern: &Fn(&U) -> bool) -> bool {
 // ============================================================================
 
 /// Argument matcher that matches if the input `arg` is equal to `target_val`.
-/// This uses approximate floating point equality, as defined by the `TODO`
-/// crate.
+/// This uses approximate floating point equality, as defined by the
+/// `float-cmp` crate.
 pub fn f32_near(arg: &f32, target_val: f32) -> bool {
-    // TODO
-    *arg == target_val
+    arg.approx_eq_ulps(&target_val, 2)
 }
 
 /// Argument matcher that matches if the input `arg` is equal to `target_val`.
-/// This uses approximate floating point equality, as defined by the `TODO`
-/// crate.
+/// This uses approximate floating point equality, as defined by the
+/// `float-cmp` crate.
 pub fn f64_near(arg: &f64, target_val: f64) -> bool {
-    // TODO
-    *arg == target_val
+    arg.approx_eq_ulps(&target_val, 2)
 }
 
 /// Argument matcher that matches if the input `arg` is equal to `target_val`.
-/// This uses approximate floating point equality, as defined by the `TODO`
-/// crate.
+/// This uses approximate floating point equality, as defined by the
+/// `float-cmp` crate.
+///
+// Unlike `f32_near`, this matcher returns `true` if both the actual `arg`
+// and the `target_val` are NaN.
 pub fn nan_sensitive_f32_near(arg: &f32, target_val: f32) -> bool {
-    // TODO
-    *arg == target_val
+    if target_val == f32::NAN && *arg == f32::NAN {
+        true
+    } else {
+        arg.approx_eq_ulps(&target_val, 2)
+    }
 }
 
 /// Argument matcher that matches if the input `arg` is equal to `target_val`.
-/// This uses approximate floating point equality, as defined by the `TODO`
-/// crate.
+/// This uses approximate floating point equality, as defined by the
+/// `float-cmp` crate.
+///
+// Unlike `f64_near`, this matcher returns `true` if both the actual `arg`
+// and the `target_val` are NaN.
 pub fn nan_sensitive_f64_near(arg: &f64, target_val: f64) -> bool {
-    // TODO
-    *arg == target_val
+    if target_val == f64::NAN && *arg == f64::NAN {
+        true
+    } else {
+        arg.approx_eq_ulps(&target_val, 2)
+    }
 }
 
 
