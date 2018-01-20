@@ -10,17 +10,6 @@ const MIN_ARGS: usize = 1;
 const MAX_ARGS: usize = 12;
 
 
-macro_rules! matcher {
-    ($m1:expr) => (
-        &|args| -> bool { match_impl_1(args, ($m1)) }
-    );
-    ($m1:expr, $m2:expr) => (
-        &|args| -> bool { match_impl_2(args, ($m1, $m2)) }
-    )
-}
-
-
-
 fn generate_matcher_macro(max_args: usize) -> String {
     assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 

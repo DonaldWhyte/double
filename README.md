@@ -224,6 +224,50 @@ Nevertheless, there might a some case where reusing the same mock and its return
 
 ### Pattern Matching
 
+When a mock function has been used in a test, we typically want to make assertions about what the mock has been called with. For example, suppose
+
+```rust
+let turtle = MockTurtle::default();
+do_something_with_the_turtle(&turtle);
+assert!(turtle.move_forward.called_with(100);
+```
+
+TODO:
+
+Sometimes you may not want to be too specific. This can make tests being too rigid. Over specification leads to brittle tests and obscures the intent of tests. Therefore, it is encouraged to specify only what's necessary &em; no more, no less.
+
+
+TODO
+
+If you care to check that `moved_forward()` will be called but aren't interested in its actual argument, write `_` as the argument, which means "anything goes":
+
+```
+using ::testing::_;
+...
+// Expects the turtle to move forward.
+EXPECT_CALL(turtle, Forward(_));
+```
+
+`_` is an instance of what we call **matchers**. A matcher is like a predicate and can test whether an argument is what we'd expect. You can use a matcher inside `EXPECT_CALL()` wherever a function argument is expected.
+
+A list of built-in matchers can be found in the [CheatSheet](CheatSheet.md). For example, here's the `Ge` (greater than or equal) matcher:
+
+```
+using ::testing::Ge;
+...
+EXPECT_CALL(turtle, Forward(Ge(100)));
+```
+
+This checks that the turtle will be told to go forward by at least 100 units.
+
+TOOD: formality of patterns
+
+Formally, a `pattern` is defined a function that receives a tuple containing a single call's argument set, checks the values in the set and returns `true` if the args "matched" the pattern and `false` otherwise.
+
+TODO
+
+#### Built-in Patterns
+
 TODO
 
 ### Other Use Cases

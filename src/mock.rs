@@ -608,8 +608,12 @@ impl<C, R> Mock<C, R>
     /// Returns true if an argument set passed into `Mock::call` matches the
     /// specified `pattern`.
     ///
-    /// TODO: link to docs that explain what patterns are (in all pattern
-    /// variants).
+    /// A `pattern` is defined a function that receives a tuple containing
+    /// all of a single call's arguments, checks the values of the arguments
+    /// and returns `true` if the args "matched" the pattern and `false`
+    /// otherwise. See the
+    /// [double repository's README.md](https://github.com/DonaldWhyte/double)
+    /// for more information on this.
     ///
     /// # Examples
     ///
