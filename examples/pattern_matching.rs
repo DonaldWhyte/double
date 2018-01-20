@@ -36,24 +36,24 @@ fn main() {
 
     // TODO: figure out how to make this not require a reference!
     assert!(forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(not, p!(gt, &84)) )
+        matcher!( cp!(not, p!(gt, &84)) )
     ));
     assert!(!forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(not, p!(gt, &0)) )
+        matcher!( cp!(not, p!(gt, &0)) )
     ));
 
     assert!(forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(all_of, vec!(p!(gt, &40), p!(lt, &90))) )
+        matcher!( cp!(all_of, vec!(p!(gt, &40), p!(lt, &90))) )
     ));
     assert!(!forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(all_of, vec!(p!(gt, &40), p!(lt, &42))) )
+        matcher!( cp!(all_of, vec!(p!(gt, &40), p!(lt, &42))) )
     ));
 
     assert!(forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(any_of, vec!(p!(lt, &100), p!(gt, &200))) )
+        matcher!( cp!(any_of, vec!(p!(lt, &100), p!(gt, &200))) )
     ));
     assert!(!forecaster.profit_at.called_with_pattern(
-        matcher!( rp!(any_of, vec!(p!(lt, &5), p!(gt, &200))) )
+        matcher!( cp!(any_of, vec!(p!(lt, &5), p!(gt, &200))) )
     ));
 
     assert!(forecaster.write_report_for.called_with_pattern(
@@ -68,13 +68,20 @@ fn main() {
     forecaster.store_forecast_result(Ok(51));
     forecaster.store_forecast_result(Err("sad_face :(".to_owned()));
     assert!(forecaster.store_forecast_result.called_with_pattern(
-        matcher!( rp!(is_ok, p!(ge, 50)) )
+        matcher!( cp!(is_ok, p!(ge, 50)) )
     ));
     assert!(forecaster.store_forecast_result.called_with_pattern(
-        matcher!( rp!(is_err, p!(contains, "sad")) )
+        matcher!( cp!(is_err, p!(contains, "sad")) )
     ));
     assert!(!forecaster.store_forecast_result.called_with_pattern(
-        matcher!( rp!(is_err, p!(contains, "happy")) )
+        matcher!( cp!(is_err, p!(contains, "happy")) )
+    ));
+    assert!(forecaster.store_forecast_result.called_with_pattern(
+        matcher!(
+            cp!(is_ok,
+                cp!(all_of, vec!(
+                    p!(ge, &50),
+                    p!(le, &60)))))
     ));
 }
 

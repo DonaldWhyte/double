@@ -345,11 +345,7 @@ impl<C, R> Mock<C, R>
         self.closures.borrow_mut().insert(args.into(), function);
     }
 
-    /// Returns true if `Mock::call` has been called.
-    ///
-    /// # Examples
-    ///
-    /// ```
+    /// Returns true if `Mock::call` has been called.1
     /// use double::Mock;
     ///
     /// let mock = Mock::<i64, ()>::default();

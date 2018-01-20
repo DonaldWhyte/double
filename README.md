@@ -185,16 +185,21 @@ After the test has run, we can verify the mock was called the right number of ti
 
 The table below lists the methods that can be used to verify the mock was invoked as expected.
 
-| Method                                          | Returns       | What It Does |
-| ----------------------------------------------- | ------------- | ------------ |
-| `calls()`                                       | `Vec<(Args)>` | return the arguments of each mock invocation, ordered by invocation time |
-| `called()`                                      | `bool`        | return `true` if method was called at least once |
-| `num_calls()`                                   | `usize`       | number of times method was called |
-| `called_with((args))`                           | `bool`        | return `true` if method was called at least once with given `args` |
-| `has_calls(vec!((args), ...))`                  | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
-| `has_calls_in_order(vec!((args), ...))`         | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
-| `has_calls_exactly(vec!((args), ...))`          | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
-| `has_calls_exactly_in_order(vec!((args), ...))` | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| Method                                                 | Returns       | What It Does |
+| ------------------------------------------------------ | ------------- | ------------ |
+| `calls()`                                              | `Vec<(Args)>` | return the arguments of each mock invocation, ordered by invocation time |
+| `called()`                                             | `bool`        | return `true` if method was called at least once |
+| `num_calls()`                                          | `usize`       | number of times method was called |
+| `called_with((args))`                                  | `bool`        | return `true` if method was called at least once with given `args` |
+| `has_calls(vec!((args), ...))`                         | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
+| `has_calls_in_order(vec!((args), ...))`                | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| `has_calls_exactly(vec!((args), ...))`                 | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
+| `has_calls_exactly_in_order(vec!((args), ...))`        | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| `called_with_pattern((matchers))`                      | `bool`        | return `true` if method was called at least once with given `args` |
+| `has_patterns(vec!((matchers), ...))`                  | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
+| `has_patterns_in_order(vec!((matchers), ...))`         | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| `has_patterns_exactly(vec!((matchers), ...))`          | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
+| `has_patterns_exactly_in_order(vec!((matchers), ...))` | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
 
 Example usage:
 
@@ -224,51 +229,197 @@ Nevertheless, there might a some case where reusing the same mock and its return
 
 ### Pattern Matching
 
-When a mock function has been used in a test, we typically want to make assertions about what the mock has been called with. For example, suppose
+When a mock function has been used in a test, we typically want to make assertions about what the mock has been called with. For example, suppose we're testing some logic that determines the next action of a robot. We might want to assert what this logic told the robot to do:
 
 ```rust
-let turtle = MockTurtle::default();
-do_something_with_the_turtle(&turtle);
-assert!(turtle.move_forward.called_with(100);
+let robot = MockRobot::default();
+do_something_with_the_robot(&robot);
+assert!(robot.move_forward.called_with(100);
 ```
 
-TODO:
+The above code checks that `do_something_with_the_robot()` should tell the robot to move 100 units forward. However, sometimes you might not want to be this specific. This can make tests being too rigid. Over specification leads to brittle tests and obscures the intent of tests. Therefore, it is encouraged to specify only what's necessary &em; no more, no less.
 
-Sometimes you may not want to be too specific. This can make tests being too rigid. Over specification leads to brittle tests and obscures the intent of tests. Therefore, it is encouraged to specify only what's necessary &em; no more, no less.
+If you care that `moved_forward()` will be called but aren't interested in its actual argument, you can simply assert on the call count:
 
+```rust
+assert!(turtle.move_forward.called())
+assert!(turtle.move_forward.num_calls() == 1u)
+```
+
+But what if the behaviour we wanted to check is a little more nuanced? What if we wanted to check that the robot was moved forward at least 100 units, but it didn't matter if the robot moved even further than that? If this case, our assertion is more specific than "was `move_forward()` called?", but the constraint is not as tight as "has to be moved _exactly_ 100 units".
+
+If we know the current implementation will move exactly 100 units, it is tempting to just use check for exact equality. However, as mentioned, this makes the tests very brittle. If the implementation is technically free to change, and start moving more than 100 units, then this test breaks. The developer has to go to the tests and fix the broken test. That change would not be required if the test wasn't overly restrictive. This may sound minor. However, code bases grow. This means the number of tests also grows. If all of the tests are brittle, then it becomes a huge burden to maintain/update these tests whenever production code changes.
+
+`double` allows developers to avoid this by using fuzzy assertions. One can perform looser assertions on mock argument values using **pattern matching**. In the robot example, we can assert that the robot move forward 100 _or more_ units with one line of code:
+
+```rust
+use double::matcher::*;
+
+assert!(robot.move_forward.called_with_pattern(p!(ge, 100)));
+```
+
+Let's break this down. First, we changed `called_with` to `called_with_pattern`. Then, we pass in the matcher we want to use like so:
+
+```rust
+p!(ge, 100)
+```
+
+The `p!` macro generates a matcher function that the mock object accepts. `ge` is the name of the matcher (ge = greater than or equal to). `100` is a *matcher argument* that configures the matcher to match on the right values. Passing `100`  to `ge` means "construct a matching function that matches values that are >= `100`".
+
+Pattern matching is also possible with functions that take multiple arguments. We simply wrap individual argument matchers using the `matcher!` macro:
+
+```rust
+assert!(robot.move.called_with_pattern(
+    matcher!( p!(ge, 100), p!(eq, Direction::Left) )
+));
+```
+
+The code above is asserting that the robot's `move()` method was called, and that the robot moved at least 100 units in the `Left` direction.
+
+There are other check functions like `called_with_pattern()` that make use of pattern matchers. See section **THEN: Asserting Code Under Test Used Mock in Expected Way** for a list of these functions.
+
+#### Formal Definition
+
+Formally, a pattern matcher is defined a function that receives a single argument's value. It performs some check on the value, returning `true` if the argument's value "matches" the desired pattern and `false` otherwise. For example, the `any` matcher (which makes any value) is defined as:
+
+```rust
+pub fn any<T>(_: &T) -> bool {
+    true
+}
+```
+
+where `_` is the argument value. Most matchers are _parametrised_. For example, the `eq` matcher takes one parameter -- the expected value. Likewise, the matcher `ge` takes one parameter, which specifies the number that the expected value should be greater than or equal to.
+
+Matchers can take any number of parameters. Additional parameters are specified as additional arguments to the matcher function. For example, here's the definition of the `eq` matcher function.
+
+```rust
+pub fn eq<T: PartialEq>(arg: &T, target_val: T) -> bool {
+    *arg == target_val
+}
+```
+
+For a parametrised matcher to be used, it must be bound to a parameter set. The `p!` macro does this. It takes a matcher function and a set of parameters to bind to it, then returns a new closure function which is bound to those parameters. For example:
+
+```rust
+let bound_matcher = p!(eq, 42);
+assert!(bound_matcher(42) == true);
+assert!(bound_matcher(10) == false);
+```
+
+Notice how the bound matcher takes a single argument &em; the argument value being matched. The matcher function's other arguments are bound within the returned closure.
+
+When passing matchers to a `Mock`'s assertion calls (e.g. `called_with_pattern` and `has_patterns`), they need to be passed as a _matcher set_. `Mock`'s assertion checks operation on the full set of arguments the mocked function has, not just individual arguments. For example, if a mocked function takes three arguments, then `called_with_pattern` expects a matcher set of size 3. The set contains one matcher for each of the mock's arguments.
+
+Matcher sets are constructed using the `matcher!` macro. This macro takes a bound matcher function for each argument in the mocked function being checked. The matchers should be specified in thesame order by TODO
+
+```rust
+let arg1_matcher = p!(eq, 42);
+let arg2_matcher = p!(lt, 10);
+let arg_set_matcher = matcher!(arg1_matcher, arg2_matcher);
+
+assert!(matcher((42, 5)) == true);
+assert!(matcher((42, -5)) == true);
+assert!(matcher((42, 10)) == false);
+assert!(matcher((100, 5)) == false);
+```
+
+Combining `matcher!` and `p!` allows developers to write concise code like this.
+
+```rust
+assert!(robot.move.called_with_pattern(
+    matcher!( p!(ge, 100), p!(eq, Direction::Left) )
+));
+```
+
+#### Nested Matchers
+
+It is possible to nest macros. For example, you might want to assert that an argument matches _multiple_ patterns. Going back to the robot example, TODO.
+
+```rust
+assert!(robot.move_forward.called_with_pattern(
+    matcher!(
+        rp!(all_of, vec!(
+            p!(gt, &100),
+            p!(lt, &200))))
+));
+```
+
+TODO: use of `rp!`
+
+#### Built-in Matchers
+
+This section lists all the standard matchers built-in into the library. See the **Defining your Own Matchers** section if none of these fit your use case.
+
+##### Wildcards
+
+|         |                                               |
+| ------- | --------------------------------------------- |
+| `any()` | argument can be any value of the correct type |
+
+##### Comparison Matchers
+
+|                    |                                                                 |
+| ------------------ | --------------------------------------------------------------- |
+| `eq(value)`        | `argument == value`                                             |
+| `ne(value)`        | `argument != value`                                             |
+| `lt(value)`        | `argument < value`                                              |
+| `le(value)`        | `argument <= value`                                             |
+| `gt(value)`        | `argument > value`                                              |
+| `ge(value)`        | `argument >= value`                                             |
+| `is_some(matcher)` | argument is an `Option::Some`, whose contents matches `matcher` |
+| `is_ok(matcher)`   | argument is an `Result::Ok`, whose contents matches `matcher`   |
+| `is_err(matcher)`  | argument is an `Result::er`, whose contents matches `matcher`   |
+
+##### Floating-Point Matchers
+
+|                               |                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `f32_eq(value)`               | argument is a value approximately equal to the `f32` `value`, treating two NaNs as unequal. |
+| `f64_eq(value)`               | argument is a value approximately equal to the `f64` `value`, treating two NaNs as unequal. |
+| `nan_sensitive_f32_eq(value)` | argument is a value approximately equal to the `f32` `value`, treating two NaNs as equal.   |
+| `nan_sensitive_f64_eq(value)` | argument is a value approximately equal to the `f64` `value`, treating two NaNs as equal.   |
+
+##### String Matchers
+
+|                       |                                                   |
+| --------------------- | ------------------------------------------------- |
+| `contains(string)`    | argument contains `string` as a sub-string.       |
+| `starts_with(prefix)` | argument starts with string `prefix`.             |
+| `starts_with(suffix)` | argument ends with string `suffix`.               |
+| `eq_nocase(string)`   | argument is equal to `string`, ignoring case.     |
+| `ne_nocase(value)`    | argument is not equal to `string`, ignoring case. |
+
+##### Container Matchers
+
+There are currently no matchers to inspect the contents of containers. These will be added in future version of `double`. There is a [GitHub issue](https://github.com/DonaldWhyte/double/issues/12) to track this work.
+
+##### Composite Matchers
+
+|                                |                                                    |
+| ------------------------------ | -------------------------------------------------- |
+| `all_of(vec!(m1, m2, ... mn))` | argument matches all of the matchers `m1` to `mn`. |
+| `any_of(vec!(m1, m2, ... mn))` | matches at least one of the matchers `m1` to `mn`. |
+| `not(m)`                       | argument doesn't match matcher `m`. |
+
+#### Defining your Own Matchers
 
 TODO
 
-If you care to check that `moved_forward()` will be called but aren't interested in its actual argument, write `_` as the argument, which means "anything goes":
-
 ```
-using ::testing::_;
-...
-// Expects the turtle to move forward.
-EXPECT_CALL(turtle, Forward(_));
+TODO: code that sets up problem
 ```
-
-`_` is an instance of what we call **matchers**. A matcher is like a predicate and can test whether an argument is what we'd expect. You can use a matcher inside `EXPECT_CALL()` wherever a function argument is expected.
-
-A list of built-in matchers can be found in the [CheatSheet](CheatSheet.md). For example, here's the `Ge` (greater than or equal) matcher:
-
-```
-using ::testing::Ge;
-...
-EXPECT_CALL(turtle, Forward(Ge(100)));
-```
-
-This checks that the turtle will be told to go forward by at least 100 units.
-
-TOOD: formality of patterns
-
-Formally, a `pattern` is defined a function that receives a tuple containing a single call's argument set, checks the values in the set and returns `true` if the args "matched" the pattern and `false` otherwise.
 
 TODO
 
-#### Built-in Patterns
+```
+TODO: custom matcher definition
+```
 
 TODO
+
+```
+TODO: usage of matcher
+```
 
 ### Other Use Cases
 
