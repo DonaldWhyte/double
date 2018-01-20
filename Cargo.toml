@@ -19,3 +19,4 @@ maplit = "1.0.1"
 
 [dependencies]
 lazysort = "0.2.0"
+float-cmp = "0.0.1"

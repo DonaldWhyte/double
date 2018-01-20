@@ -27,23 +27,54 @@ fn main() {
     forecaster.write_report_for(84, true);
     forecaster.write_report_for(42, false);
 
-    let profit_at_matches = forecaster.profit_at.called_with_pattern(
+    assert!(forecaster.profit_at.called_with_pattern(
         matcher!( p!(eq, 42) )
-    );
-    println!("profit_at {:?}", profit_at_matches);
+    ));
+    assert!(!forecaster.profit_at.called_with_pattern(
+        matcher!( p!(gt, 84) )
+    ));
 
-    let write_report_for_matches = forecaster.write_report_for.called_with_pattern(
+    // TODO: figure out how to make this not require a reference!
+    assert!(forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(not, p!(gt, &84)) )
+    ));
+    assert!(!forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(not, p!(gt, &0)) )
+    ));
+
+    assert!(forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(all_of, vec!(p!(gt, &40), p!(lt, &90))) )
+    ));
+    assert!(!forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(all_of, vec!(p!(gt, &40), p!(lt, &42))) )
+    ));
+
+    assert!(forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(any_of, vec!(p!(lt, &100), p!(gt, &200))) )
+    ));
+    assert!(!forecaster.profit_at.called_with_pattern(
+        matcher!( rp!(any_of, vec!(p!(lt, &5), p!(gt, &200))) )
+    ));
+
+    assert!(forecaster.write_report_for.called_with_pattern(
         matcher!( p!(eq, 42), p!(eq, false) )
-    );
-    println!("write_report_for {:?}", write_report_for_matches);
+    ));
 
-    let write_report_for_matches_all = forecaster.write_report_for.has_patterns(vec!(
+    assert!(forecaster.write_report_for.has_patterns(vec!(
         matcher!( p!(eq, 42), p!(eq, true) ),
         matcher!( p!(eq, 42), p!(eq, false) )
-    ));
-    println!("write_report_for matches all: {:?}", write_report_for_matches_all);
+    )));
 
+    forecaster.store_forecast_result(Ok(51));
+    forecaster.store_forecast_result(Err("sad_face :(".to_owned()));
     assert!(forecaster.store_forecast_result.called_with_pattern(
-        matcher!( p!(is_ok, nested_p!(ge, 50)) )
+        matcher!( rp!(is_ok, p!(ge, 50)) )
+    ));
+    assert!(forecaster.store_forecast_result.called_with_pattern(
+        matcher!( rp!(is_err, p!(contains, "sad")) )
+    ));
+    assert!(!forecaster.store_forecast_result.called_with_pattern(
+        matcher!( rp!(is_err, p!(contains, "happy")) )
     ));
 }
+

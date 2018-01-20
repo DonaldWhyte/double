@@ -42,18 +42,18 @@ include!(concat!(env!("OUT_DIR"), "/matcher_generated.rs"));
 /// # }
 /// ```
 #[macro_export]
-macro_rules! p {
+macro_rules! rp {
     ( $func:ident ) => (
-        &|ref potential_match| -> bool { $func(&potential_match) }
+        &|ref potential_match| -> bool { $func(potential_match) }
     );
 
     ( $func:ident, $arg:expr ) => (
-        &|ref potential_match| -> bool { $func(&potential_match, $arg) }
+        &|ref potential_match| -> bool { $func(potential_match, $arg) }
     );
 }
 
 #[macro_export]
-macro_rules! nested_p {
+macro_rules! p {
     ( $func:ident ) => (
         &|potential_match| -> bool { $func(potential_match) }
     );
@@ -76,6 +76,12 @@ pub fn any<T>(_: &T) -> bool {
 /// Argument matcher that matches if the input `arg` is equal to `target_val`.
 pub fn eq<T: PartialEq>(arg: &T, target_val: T) -> bool {
     *arg == target_val
+}
+
+/// Argument matcher that matches if the input `arg` is not equal to
+/// `target_val`.
+pub fn ne<T: PartialEq>(arg: &T, target_val: T) -> bool {
+    *arg != target_val
 }
 
 /// Argument matcher that matches if the input `arg` is less than `target_val`.
@@ -201,24 +207,40 @@ pub fn all_of<T>(arg: &T, patterns: Vec<&Fn(&T) -> bool>) -> bool {
 pub fn any_of<T>(arg: &T, patterns: Vec<&Fn(&T) -> bool>) -> bool {
     for pat in patterns {
         if pat(arg) {
-            return false
+            return true
         }
     }
     false
-}
-
-
-fn test() {
-    let foo: Result<i32, String> = Ok(42);
-    let _ = p!(is_ok, nested_p!(ge, 50))(foo);
 }
 
 // ============================================================================
 // * String Matchers
 // ============================================================================
 
-// TODO
+/// TODO
+pub fn contains(arg: &str, substring: &str) -> bool {
+    arg.contains(substring)
+}
 
+/// TODO
+pub fn starts_with(arg: &str, substring: &str) -> bool {
+    arg.starts_with(substring)
+}
+
+/// TODO
+pub fn ends_with(arg: &str, substring: &str) -> bool {
+    arg.ends_with(substring)
+}
+
+/// TODO
+pub fn eq_nocase(arg: &str, string: &str) -> bool {
+    arg.to_lowercase() == string
+}
+
+/// TODO
+pub fn ne_nocase(arg: &str, string: &str) -> bool {
+    arg.to_lowercase() == string
+}
 
 // ============================================================================
 // * Container Matchers
