@@ -117,7 +117,7 @@ pub fn match_impl_{}<{}>(args: &(
 fn generate_p_macro(max_args: usize) -> String {
     assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 
-    let arg_nums: Vec<usize> = (MIN_ARGS..MAX_ARGS).collect();
+    let arg_nums: Vec<usize> = (MIN_ARGS - 1..MAX_ARGS).collect();
     let macro_cases: Vec<String> = arg_nums.iter().map(
         |&i| generate_p_macro_case_n(i)
     ).collect();
@@ -127,20 +127,27 @@ fn generate_p_macro(max_args: usize) -> String {
 }
 
 fn generate_p_macro_case_n(n_args: usize) -> String {
-    let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
-    let case_args: Vec<String> = arg_nums.iter().map(
-        |&i| format!("$arg{}:expr", i.to_string())
-    ).collect();
-    let impl_func_call_args: Vec<String> = arg_nums.iter().map(
-        |&i| format!("$arg{}", i.to_string())
-    ).collect();
+    if n_args == 0 {
+        return "
+        ($func: ident) => (
+            &|potential_match| -> bool {{ $func(potential_match) }}
+        );".to_owned()
+    } else {
+        let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
+        let case_args: Vec<String> = arg_nums.iter().map(
+            |&i| format!("$arg{}:expr", i.to_string())
+        ).collect();
+        let impl_func_call_args: Vec<String> = arg_nums.iter().map(
+            |&i| format!("$arg{}", i.to_string())
+        ).collect();
 
-    format!("
-    ($func: ident, {}) => (
-        &|potential_match| -> bool {{ $func(potential_match, {}) }}
-    );",
-        case_args.join(", "),
-        impl_func_call_args.join(", "))
+        format!("
+        ($func: ident, {}) => (
+            &|potential_match| -> bool {{ $func(potential_match, {}) }}
+        );",
+            case_args.join(", "),
+            impl_func_call_args.join(", "))
+    }
 }
 
 fn main() {

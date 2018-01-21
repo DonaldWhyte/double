@@ -415,7 +415,7 @@ There are currently no matchers to inspect the contents of containers. These wil
 
 #### Defining your Own Matchers
 
-TODO
+If none of the code
 
 ```
 TODO: code that sets up problem
