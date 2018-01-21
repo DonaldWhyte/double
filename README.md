@@ -187,19 +187,19 @@ The table below lists the methods that can be used to verify the mock was invoke
 
 | Method                                                 | Returns       | What It Does |
 | ------------------------------------------------------ | ------------- | ------------ |
-| `calls()`                                              | `Vec<(Args)>` | return the arguments of each mock invocation, ordered by invocation time |
-| `called()`                                             | `bool`        | return `true` if method was called at least once |
-| `num_calls()`                                          | `usize`       | number of times method was called |
-| `called_with((args))`                                  | `bool`        | return `true` if method was called at least once with given `args` |
-| `has_calls(vec!((args), ...))`                         | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
-| `has_calls_in_order(vec!((args), ...))`                | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
-| `has_calls_exactly(vec!((args), ...))`                 | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
-| `has_calls_exactly_in_order(vec!((args), ...))`        | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
-| `called_with_pattern((matchers))`                      | `bool`        | return `true` if method was called at least once with given `args` |
-| `has_patterns(vec!((matchers), ...))`                  | `bool`        | return `true` if method was called at least once for each of the given `args` tuples |
-| `has_patterns_in_order(vec!((matchers), ...))`         | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
-| `has_patterns_exactly(vec!((matchers), ...))`          | `bool`        | return `true` if method was called exactly once for each of the given `args` collections|
-| `has_patterns_exactly_in_order(vec!((matchers), ...))` | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec` |
+| `calls()`                                              | `Vec<(Args)>` | return the arguments of each mock invocation, ordered by invocation time. |
+| `called()`                                             | `bool`        | return `true` if method was called at least once. |
+| `num_calls()`                                          | `usize`       | number of times method was called. |
+| `called_with((args))`                                  | `bool`        | return `true` if method was called at least once with given `args`. |
+| `has_calls(vec!((args), ...))`                         | `bool`        | return `true` if method was called at least once for each of the given `args` tuples. |
+| `has_calls_in_order(vec!((args), ...))`                | `bool`        | return `true` if method was called at least once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec`. |
+| `has_calls_exactly(vec!((args), ...))`                 | `bool`        | return `true` if method was called exactly once for each of the given `args` collections. |
+| `has_calls_exactly_in_order(vec!((args), ...))`        | `bool`        | return `true` if method was called exactly once for each of the given `args` collections, and called with arguments in the same order as specified in the input `vec`. |
+| `called_with_pattern(matcher_set)`                      | `bool`        | return `true` if method was called at least once with args that match the given matcher set. |
+| `has_patterns(vec!(matcher_set, ...))`                  | `bool`        | return `true` if all of the given matcher sets were matched at least once by the mock's calls. |
+| `has_patterns_in_order(vec!(matcher_set, ...))`         | `bool`        | return `true` if mock has calls that match all the specified matcher sets. The matcher sets must be matched in the order they are specified by the input `matcher_set` vector. |
+| `has_patterns_exactly(vec!(matcher_set, ...))`          | `bool`        | return `true` if all of the given matcher sets were matched at least once by the mock's calls. The number of calls equal the number of specified matcher sets. |
+| `has_patterns_exactly_in_order(vec!(matcher_set, ...))` | `bool`        | return `true` if mock has calls that match all the specified matcher sets. The matcher sets must be matched in the order they are specified by the input `matcher_set` vector. T the number of calls equal the number of specified matcher sets. |
 
 Example usage:
 
@@ -218,6 +218,8 @@ assert!(sheet.profit.has_calls_in_order((42, 10), (5, 0)));
 assert!(sheet.profit.has_calls_exactly((5, 0), (42, 10)));
 assert!(sheet.profit.has_calls_exactly_in_order((42, 10), (5, 0)));
 ```
+
+> See section **Pattern Matching** for detail on how to use the pattern-based assertions.
 
 #### Reusing Mocks Across Multiple Tests
 
