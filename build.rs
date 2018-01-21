@@ -114,11 +114,40 @@ pub fn match_impl_{}<{}>(args: &(
         matcher_invocations.join(",\n        "))
 }
 
+fn generate_p_macro(max_args: usize) -> String {
+    assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
+
+    let arg_nums: Vec<usize> = (MIN_ARGS..MAX_ARGS).collect();
+    let macro_cases: Vec<String> = arg_nums.iter().map(
+        |&i| generate_p_macro_case_n(i)
+    ).collect();
+    format!(
+        "#[macro_export]\nmacro_rules! p {{\n{}\n\n}}",
+        macro_cases.join("\n"))
+}
+
+fn generate_p_macro_case_n(n_args: usize) -> String {
+    let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
+    let case_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$arg{}:expr", i.to_string())
+    ).collect();
+    let impl_func_call_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$arg{}", i.to_string())
+    ).collect();
+
+    format!("
+    ($func: ident, {}) => (
+        &|potential_match| -> bool {{ $func(potential_match, {}) }}
+    );",
+        case_args.join(", "),
+        impl_func_call_args.join(", "))
+}
+
 fn main() {
-    let file_contents = format!(
-        "{}\n\n{}\n",
+    let file_contents = vec!(
         generate_matcher_macro(MAX_ARGS),
-        generate_match_impls(MAX_ARGS));
+        generate_match_impls(MAX_ARGS),
+        generate_p_macro(MAX_ARGS)).join("\n\n");
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("matcher_generated.rs");

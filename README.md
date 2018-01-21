@@ -310,7 +310,9 @@ Notice how the bound matcher takes a single argument &em; the argument value bei
 
 When passing matchers to a `Mock`'s assertion calls (e.g. `called_with_pattern` and `has_patterns`), they need to be passed as a _matcher set_. `Mock`'s assertion checks operation on the full set of arguments the mocked function has, not just individual arguments. For example, if a mocked function takes three arguments, then `called_with_pattern` expects a matcher set of size 3. The set contains one matcher for each of the mock's arguments.
 
-Matcher sets are constructed using the `matcher!` macro. This macro takes a bound matcher function for each argument in the mocked function being checked. The matchers should be specified in thesame order by TODO
+Matcher sets are constructed using the `matcher!` macro. This macro takes a bound matcher function for each argument in the mocked function. The order of the matcher functions corresponds to the order of the arguments in the mocked function.
+
+Here's an example of `matcher!` in use:
 
 ```rust
 let arg1_matcher = p!(eq, 42);
@@ -323,28 +325,38 @@ assert!(matcher((42, 10)) == false);
 assert!(matcher((100, 5)) == false);
 ```
 
-Combining `matcher!` and `p!` allows developers to write concise code like this.
+In reality, most `matcher!` and `p!` invocations will be made within the assertion call. Combining `matcher!` and `p!` invocations inline allows developers to write concise and expressive assertions like this:
 
 ```rust
+// This reads:
+//     * first arg should be >= 100
+//     * second arg should be `Direction::Left`
+
 assert!(robot.move.called_with_pattern(
     matcher!( p!(ge, 100), p!(eq, Direction::Left) )
 ));
 ```
 
-#### Nested Matchers
+#### Nesting Matchers
 
-It is possible to nest macros. For example, you might want to assert that an argument matches _multiple_ patterns. Going back to the robot example, TODO.
+It is possible to nest matchers. For example, you might want to assert that an argument matches _multiple_ patterns.
+
+Going back to the robot example, perhaps we don't care about the _exact_ amount the robot moved forward, but we care it's between some range. Let's say want to assert that the moved between the 100-200 unit range. No less, no more.
+
+We use use two matchers, `ge` and `le`, for the one argument. We wrap them in the composite matcher `all_of`, like so:
 
 ```rust
 assert!(robot.move_forward.called_with_pattern(
     matcher!(
-        rp!(all_of, vec!(
-            p!(gt, &100),
-            p!(lt, &200))))
+        p!(all_of, vec!(
+            p!(ge, 100),
+            p!(le, 200))))
 ));
 ```
 
-TODO: use of `rp!`
+Users can nested matchers using the `p!` macro an arbitrary number of times. Try not to go too far with this feature though, as it can lead to tests that are difficult to read.
+
+> NOTE: The above was for illustration. The simpler way to perform a value range check is using the non-composite `between_exc` and `between_inc` macros.
 
 #### Built-in Matchers
 
