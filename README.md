@@ -411,26 +411,97 @@ There are currently no matchers to inspect the contents of containers. These wil
 | ------------------------------ | -------------------------------------------------- |
 | `all_of(vec!(m1, m2, ... mn))` | argument matches all of the matchers `m1` to `mn`. |
 | `any_of(vec!(m1, m2, ... mn))` | matches at least one of the matchers `m1` to `mn`. |
-| `not(m)`                       | argument doesn't match matcher `m`. |
+| `not(m)`                       | argument doesn't match matcher `m`.                |
 
 #### Defining your Own Matchers
 
-If none of the code
+If none of the built-in matchers fit your use case, you can define your own.
 
-```
-TODO: code that sets up problem
+Suppose we were testing a restful service. We have some request handling logic. We want to test the handling logic responded to the request correctly. In this context, "correctly" means it responded with a JSON object that contains the "time" key.
+
+Here's the production code to test:
+
+```rust
+trait ResponseSender {
+    fn send_response(&mut self, response: &str);
+}
+
+fn request_handler(response_sender: &mut ResponseSender) {
+    // business logic here
+    response_sender.send_response(
+        "{ \"current_time\": \"2017-06-10 20:30:00\" }");
+}
 ```
 
-TODO
+Let's mock response sender and assert on the contents of the JSON response:
 
-```
-TODO: custom matcher definition
+```rust
+mock_trait!(
+    MockResponseSender,
+    send_response(&str) -> ());
+impl ResponseSender for MockResponseSender {
+    mock_method!(send_response(&mut self, response: &str));
+}
+
+#[test]
+fn ensure_current_time_field_is_returned() {
+    // GIVEN:
+    let mut mock_sender = MockResponseSender::default();
+
+    // WHEN:
+    request_handler(&mock_sender);
+
+    // THEN:
+    // check the sender received a response that contains a current_time field
+}
 ```
 
-TODO
+This check is cumbersome. One has to manually extract the text string passed to the mock, parse it as JSON (handling invalid JSON) and manually checking
 
+For one test, perhaps this is not an issue. However, imagine we had multiple test cases for dozens of API endpoints. Duplicating the same JSON assertion logic across all the tests leads to code repetition. This repetition buries the intentions of the tests and makes them harder to change.
+
+Custom matchers to the rescue! We can use matchers to check if the response text string is a valid JSON object that has a certain key/field.
+
+A matcher is defined as a function that takes at least one argument (the `arg` being matched) and zero or more parameters. It returns a `bool` that indicates if `arg` is a match. We have one parameter in this case &em; the `key` we're asserting exists in the response.
+
+```rust
+extern crate json;
+use self::json;
+
+fn is_json_object_with_key(arg: &str, key: &str) -> bool {
+    match json::parse(str) {
+        Ok(json_value) => match json_value {
+            Object(object) => match object.get(key) {
+                Some(_) => true  // JSON object that contains key
+                None => false    // JSON object that does contain key
+            },
+            _ => false  // not a object (must be another JSON type)
+        },
+        Err(_) => false  // not valid JSON
+    }
+}
 ```
-TODO: usage of matcher
+
+Using the matcher then requires binding it to a parameter (using `p!`) and passing it to a mock assertion method, like so:
+
+```rust
+fn ensure_current_time_field_is_returned() {
+    // GIVEN:
+    let mut mock_sender = MockResponseSender::default();
+
+    // WHEN:
+    request_handler(&mock_sender);
+
+    // THEN:
+    // we expect a "time" field to be in the response JSON
+    assert(response_sender.send_response.called_with_pattern(
+        p!(is_json_object_with_key, "time")
+    ));
+    // we DO NOT expect a "time" field to be in the response JSON
+    assert(!response_sender.send_response.called_with_pattern(
+        p!(is_json_object_with_key, "records")
+    ));
+}
 ```
 
 ### Other Use Cases
@@ -459,7 +530,7 @@ impl Queue for MockQueue {
 
 The `mock_trait!` macro assumes the return types of all the methods in the mocked `trait` implement `Default`. This makes it convenient to construct the mock object. One can invoke `MockTrait::default()` to construct the mock object and auto-configure it return default values for all methods in one go.
 
-If a `trait` provides a method that returns a type that _does not_ implement `Default`, then one must generate the mock using `mock_trait_no_default!`. This macro generates a mock that does not implement `Default`. Clients must construct instances of the generated mock using `MockTrait::new()`, manually specifying the default return values for each method.
+If a `trait` provides a method that returns a type that _doesn't_ implement `Default`, then one must generate the mock using `mock_trait_no_default!`. This macro generates a mock that doesn't implement `Default`. Clients must construct instances of the generated mock using `MockTrait::new()`, manually specifying the default return values for each method.
 
 For example:
 
