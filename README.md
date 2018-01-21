@@ -239,7 +239,7 @@ do_something_with_the_robot(&robot);
 assert!(robot.move_forward.called_with(100);
 ```
 
-The above code checks that `do_something_with_the_robot()` should tell the robot to move 100 units forward. However, sometimes you might not want to be this specific. This can make tests being too rigid. Over specification leads to brittle tests and obscures the intent of tests. Therefore, it is encouraged to specify only what's necessary &em; no more, no less.
+The above code checks that `do_something_with_the_robot()` should tell the robot to move 100 units forward. However, sometimes you might not want to be this specific. This can make tests being too rigid. Over specification leads to brittle tests and obscures the intent of tests. Therefore, it is encouraged to specify only what's necessary &mdash; no more, no less.
 
 If you care that `moved_forward()` will be called but aren't interested in its actual argument, you can simply assert on the call count:
 
@@ -308,7 +308,7 @@ assert!(bound_matcher(42) == true);
 assert!(bound_matcher(10) == false);
 ```
 
-Notice how the bound matcher takes a single argument &em; the argument value being matched. The matcher function's other arguments are bound within the returned closure.
+Notice how the bound matcher takes a single argument &mdash; the argument value being matched. The matcher function's other arguments are bound within the returned closure.
 
 When passing matchers to a `Mock`'s assertion calls (e.g. `called_with_pattern` and `has_patterns`), they need to be passed as a _matcher set_. `Mock`'s assertion checks operation on the full set of arguments the mocked function has, not just individual arguments. For example, if a mocked function takes three arguments, then `called_with_pattern` expects a matcher set of size 3. The set contains one matcher for each of the mock's arguments.
 
@@ -464,7 +464,7 @@ For one test, perhaps this is not an issue. However, imagine we had multiple tes
 
 Custom matchers to the rescue! We can use matchers to check if the response text string is a valid JSON object that has a certain key/field.
 
-A matcher is defined as a function that takes at least one argument (the `arg` being matched) and zero or more parameters. It returns a `bool` that indicates if `arg` is a match. We have one parameter in this case &em; the `key` we're asserting exists in the response.
+A matcher is defined as a function that takes at least one argument (the `arg` being matched) and zero or more parameters. It returns a `bool` that indicates if `arg` is a match. We have one parameter in this case &mdash; the `key` we're asserting exists in the response.
 
 ```rust
 extern crate json;
