@@ -4,7 +4,7 @@
 
 [![Build Status](https://travis-ci.org/DonaldWhyte/double.svg?branch=master)](https://travis-ci.org/DonaldWhyte/double) [![Docs](https://docs.rs/double/badge.svg)](https://docs.rs/double)
 
-Double lets you mock `trait` implementations so that you can track function call arguments and set return values or overrides functions at test time. foo
+Double lets you mock `trait` implementations so that you can track function call arguments and set return values or overrides functions at test time.
 
 Here's a quick example:
 
