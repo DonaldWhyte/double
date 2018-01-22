@@ -244,8 +244,8 @@ The above code checks that `do_something_with_the_robot()` should tell the robot
 If you care that `moved_forward()` will be called but aren't interested in its actual argument, you can simply assert on the call count:
 
 ```rust
-assert!(turtle.move_forward.called())
-assert!(turtle.move_forward.num_calls() == 1u)
+assert!(robot.move_forward.called())
+assert!(robot.move_forward.num_calls() == 1u)
 ```
 
 But what if the behaviour we wanted to check is a little more nuanced? What if we wanted to check that the robot was moved forward at least 100 units, but it didn't matter if the robot moved even further than that? If this case, our assertion is more specific than "was `move_forward()` called?", but the constraint is not as tight as "has to be moved _exactly_ 100 units".
