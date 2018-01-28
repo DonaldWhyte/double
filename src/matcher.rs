@@ -514,61 +514,6 @@ mod tests {
     }
 
     #[test]
-    fn has_substr_matcher() {
-        let empty_matcher = p!(has_substr, "");
-        assert!(empty_matcher(""));
-        assert!(empty_matcher("foo"));
-        assert!(empty_matcher("barfooban"));
-        assert!(empty_matcher("ban"));
-
-        let matcher = p!(has_substr, "foo");
-        assert!(!matcher(""));
-        assert!(matcher("foo"));
-        assert!(matcher("barfooban"));
-        assert!(!matcher("ban"));
-    }
-
-    #[test]
-    fn starts_with_matcher() {
-        let empty_matcher = p!(starts_with, "");
-        assert!(empty_matcher(""));
-        assert!(empty_matcher("foo"));
-        assert!(empty_matcher("barfooban"));
-        assert!(empty_matcher("ban"));
-
-        let matcher = p!(starts_with, "foo");
-        assert!(!matcher(""));
-        assert!(matcher("foo"));
-        assert!(!matcher("barfooban"));
-        assert!(!matcher("ban"));
-    }
-    #[test]
-    fn ends_with_matcher() {
-        let empty_matcher = p!(ends_with, "");
-        assert!(empty_matcher(""));
-        assert!(empty_matcher("foo"));
-        assert!(empty_matcher("barfooban"));
-        assert!(empty_matcher("ban"));
-
-        let matcher = p!(ends_with, "ban");
-        assert!(!matcher(""));
-        assert!(!matcher("banfoo"));
-        assert!(matcher("barfooban"));
-        assert!(matcher("ban"));
-    }
-
-    #[test]
-    fn eq_nocase_matcher() {
-        let matcher = p!(eq_nocase, "foo");
-        assert!(!matcher(""));
-        assert!(matcher("FOo"));
-        assert!(matcher("FOO"));
-        assert!(matcher("foo"));
-        assert!(!matcher("barfoo"));
-        assert!(!matcher("barFOO"));
-    }
-
-    #[test]
     fn ne_nocase_matcher() {
         let matcher = p!(ne_nocase, "foo");
         assert!(matcher(""));
@@ -625,6 +570,61 @@ when_sorted
     - already sorted, not equal
     - not sorted, not equal
 */
+
+    #[test]
+    fn has_substr_matcher() {
+        let empty_matcher = p!(has_substr, "");
+        assert!(empty_matcher(""));
+        assert!(empty_matcher("foo"));
+        assert!(empty_matcher("barfooban"));
+        assert!(empty_matcher("ban"));
+
+        let matcher = p!(has_substr, "foo");
+        assert!(!matcher(""));
+        assert!(matcher("foo"));
+        assert!(matcher("barfooban"));
+        assert!(!matcher("ban"));
+    }
+
+    #[test]
+    fn starts_with_matcher() {
+        let empty_matcher = p!(starts_with, "");
+        assert!(empty_matcher(""));
+        assert!(empty_matcher("foo"));
+        assert!(empty_matcher("barfooban"));
+        assert!(empty_matcher("ban"));
+
+        let matcher = p!(starts_with, "foo");
+        assert!(!matcher(""));
+        assert!(matcher("foo"));
+        assert!(!matcher("barfooban"));
+        assert!(!matcher("ban"));
+    }
+    #[test]
+    fn ends_with_matcher() {
+        let empty_matcher = p!(ends_with, "");
+        assert!(empty_matcher(""));
+        assert!(empty_matcher("foo"));
+        assert!(empty_matcher("barfooban"));
+        assert!(empty_matcher("ban"));
+
+        let matcher = p!(ends_with, "ban");
+        assert!(!matcher(""));
+        assert!(!matcher("banfoo"));
+        assert!(matcher("barfooban"));
+        assert!(matcher("ban"));
+    }
+
+    #[test]
+    fn eq_nocase_matcher() {
+        let matcher = p!(eq_nocase, "foo");
+        assert!(!matcher(""));
+        assert!(matcher("FOo"));
+        assert!(matcher("FOO"));
+        assert!(matcher("foo"));
+        assert!(!matcher("barfoo"));
+        assert!(!matcher("barFOO"));
+    }
 
     #[test]
     fn not_matcher() {

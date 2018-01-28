@@ -405,7 +405,14 @@ This section lists all the standard matchers built-in into the library. See the 
 
 ##### Container Matchers
 
-There are currently no matchers to inspect the contents of containers. These will be added in future version of `double`. There is a [GitHub issue](https://github.com/DonaldWhyte/double/issues/12) to track this work.
+|                                    |                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `is_empty`                         | argument implements `IntoIterator` and contains no elements.                                                  |
+| `has_length(size_matcher)`         | argument implements `IntoIterator` whose element count matches `size_matcher`.                                |
+| `contains(elem_matcher)`           | argument implements `IntoIterator` and contains at least one element that matches `elem_matcher`.             |
+| `each(elem_matcher)`               | argument implements `IntoIterator` and all of its elements match `elem_matcher`.                              |
+| `unordered_elements_are(elements)` | argument implements `IntoIterator` that contains the same elements as the vector `elements` (ignoring order). |
+| `when_sorted(elements)`            | argument implements `IntoIterator` that, when its elements are sorted, matches the vector `elements`.         |
 
 ##### Composite Matchers
 
