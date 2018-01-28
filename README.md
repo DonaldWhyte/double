@@ -1,6 +1,6 @@
 # Double
 
-### Full-featured mocking library in Rust, including rich failure messages and argument matchers.
+### Full-featured mocking library in Rust with feature-rich argument matchers.
 
 [![Build Status](https://travis-ci.org/DonaldWhyte/double.svg?branch=master)](https://travis-ci.org/DonaldWhyte/double) [![Docs](https://docs.rs/double/badge.svg)](https://docs.rs/double)
 
