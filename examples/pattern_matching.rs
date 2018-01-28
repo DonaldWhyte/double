@@ -76,10 +76,10 @@ fn main() {
         matcher!( p!(is_ok, p!(ge, 50)) )
     ));
     assert!(forecaster.store_forecast_result.called_with_pattern(
-        matcher!( p!(is_err, p!(contains, "sad")) )
+        matcher!( p!(is_err, p!(has_substr, "sad")) )
     ));
     assert!(!forecaster.store_forecast_result.called_with_pattern(
-        matcher!( p!(is_err, p!(contains, "happy")) )
+        matcher!( p!(is_err, p!(has_substr, "happy")) )
     ));
     assert!(forecaster.store_forecast_result.called_with_pattern(
         matcher!(

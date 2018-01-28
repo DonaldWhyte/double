@@ -1,5 +1,6 @@
 extern crate float_cmp;
 
+use std::collections::HashSet;
 use std::f32;
 use std::f64;
 use self::float_cmp::ApproxEqUlps;
@@ -140,8 +141,9 @@ pub fn nan_sensitive_f64_eq(arg: &f64, target_val: f64) -> bool {
 // * String Matchers
 // ============================================================================
 
-/// Matcher that matches if `arg` contains the substring specified by `string`.
-pub fn contains(arg: &str, string: &str) -> bool {
+/// Matcher that matches if `has_substr` contains the substring specified by
+/// `string`.
+pub fn has_substr(arg: &str, string: &str) -> bool {
     arg.contains(string)
 }
 
@@ -171,7 +173,109 @@ pub fn ne_nocase(arg: &str, string: &str) -> bool {
 // * Container Matchers
 // ============================================================================
 
-// TODO
+// TODO: comment on intoitertor + clone thing
+
+/// TODO
+pub fn is_empty<T: Clone + IntoIterator>(arg: &T) -> bool {
+    let elements: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    elements.is_empty()
+}
+
+/// TODO
+pub fn is_length<T: Clone + IntoIterator>(
+    arg: &T,
+    matcher: &Fn(&usize) -> bool) -> bool
+{
+    let elements: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    matcher(&elements.len())
+}
+
+/// TODO
+pub fn contains<T: Clone + IntoIterator>(
+    arg: &T,
+    matcher: &Fn(&T::Item) -> bool) -> bool
+{
+    let actual: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    for elem in actual.iter() {
+        if !matcher(&elem) {
+            return true;
+        }
+    }
+    false
+}
+
+/// TODO
+pub fn each<T: Clone + IntoIterator>(
+    arg: &T,
+    matcher: &Fn(&T::Item) -> bool) -> bool
+{
+    let actual: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    for elem in actual.iter() {
+        if !matcher(&elem) {
+            return false;
+        }
+    }
+    true
+}
+
+/// TODO
+pub fn unordered_elements_are<T: Clone + IntoIterator>(
+    arg: &T,
+    expected_elems: Vec<T::Item>) -> bool
+    where T::Item: Eq
+{
+    let actual: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    if actual.len() == expected_elems.len() {
+        let mut matched_indices: HashSet<usize> = HashSet::new();
+        for actual_idx in 0..actual.len() {
+            for expected_idx in 0..expected_elems.len() {
+                if !matched_indices.contains(&expected_idx) {
+                    if actual[actual_idx] == expected_elems[expected_idx] {
+                        matched_indices.insert(expected_idx);
+                    }
+                }
+            }
+        }
+        matched_indices.len() == actual.len()
+    } else {
+        false
+    }
+}
+
+/// TODO
+pub fn when_sorted<T: Clone + IntoIterator>(
+    arg: &T,
+    expected: Vec<T::Item>) -> bool
+    where T::Item: Ord
+{
+    let mut actual: Vec<T::Item> = arg
+        .clone()
+        .into_iter()
+        .map(|e| e.into())
+        .collect();
+    actual.sort();
+    actual == expected
+}
 
 
 // ============================================================================
@@ -410,14 +514,14 @@ mod tests {
     }
 
     #[test]
-    fn contains_matcher() {
-        let empty_matcher = p!(contains, "");
+    fn has_substr_matcher() {
+        let empty_matcher = p!(has_substr, "");
         assert!(empty_matcher(""));
         assert!(empty_matcher("foo"));
         assert!(empty_matcher("barfooban"));
         assert!(empty_matcher("ban"));
 
-        let matcher = p!(contains, "foo");
+        let matcher = p!(has_substr, "foo");
         assert!(!matcher(""));
         assert!(matcher("foo"));
         assert!(matcher("barfooban"));
@@ -474,6 +578,53 @@ mod tests {
         assert!(matcher("barfoo"));
         assert!(matcher("barFOO"));
     }
+
+    #[test]
+    fn is_empty_matcher() {
+        let empty_vec: Vec<i32> = vec!();
+        assert!(is_empty(&empty_vec));
+        assert!(!is_empty(&vec!(42)));
+        assert!(!is_empty(&vec!(42, 84, 100)));
+    }
+
+    /*#[test]
+    fn is_length_matcher() {
+        let matcher = p!(is_length, p!(gt, 1usize));
+        let empty_vec: Vec<i32> = vec!();
+        assert!(!matcher(&empty_vec));
+        assert!(!matcher(&vec!(1)));
+        assert!(matcher(&vec!(1, 2)));
+        assert!(matcher(&vec!(1, 2, 3)));
+    }*/
+
+    #[test]
+    fn contains_matcher() {
+        let matcher = p!(contains, p!(ge,   5));
+        assert!(!matcher(&vec!(1, 2, 3)));  // 0 matches
+        assert!(matcher(&vec!(1, 5, 3)));   // 1 match
+        assert!(matcher(&vec!(5, 6, 7)));   // > 1 matches
+    }
+/*
+    #[test]
+    fn each_matcher() {
+        let matcher = p!(each, p!(ge, 5));
+        assert!(!matcher(&vec!(1, 2, 3)));  // 0 matches
+        assert!(!matcher(&vec!(1, 5, 3)));   // 1 match
+        assert!(matcher(&vec!(5, 6, 7)));   // all matches
+    }
+
+
+unordered_elements_are
+    - different number of elements
+    - same number of elements, diff values
+    - same number, same values, diff order
+    - same number, same values, same order
+when_sorted
+    - already sorted, equal
+    - not sorted, equal
+    - already sorted, not equal
+    - not sorted, not equal
+*/
 
     #[test]
     fn not_matcher() {
