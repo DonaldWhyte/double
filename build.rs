@@ -150,19 +150,19 @@ fn generate_p_macro_case_n(n_args: usize) -> String {
     }
 }
 
-fn generate_mock_function_macro(max_args: usize) -> String {
+fn generate_mock_func_macro(max_args: usize) -> String {
     assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 
     let arg_nums: Vec<usize> = (MIN_ARGS - 1..MAX_ARGS).collect();
     let macro_cases: Vec<String> = arg_nums.iter().map(
-        |&i| generate_mock_function_macro_case_n(i)
+        |&i| generate_mock_func_macro_case_n(i)
     ).collect();
     format!(
-        "#[macro_export]\nmacro_rules! mock_function {{\n{}\n\n}}",
+        "#[macro_export]\nmacro_rules! mock_func {{\n{}\n\n}}",
         macro_cases.join("\n"))
 }
 
-fn generate_mock_function_macro_case_n(n_args: usize) -> String {
+fn generate_mock_func_macro_case_n(n_args: usize) -> String {
     let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
     let case_args: Vec<String> = arg_nums.iter().map(
         |&i| format!("$arg{}_type:ty", i.to_string())
@@ -197,7 +197,7 @@ fn main() {
     }
 
     {
-        let file_contents = generate_mock_function_macro(MAX_ARGS);
+        let file_contents = generate_mock_func_macro(MAX_ARGS);
         let dest_path = Path::new(&out_dir).join("macros_generated.rs");
         let mut f = File::create(&dest_path).unwrap();
         f.write_all(file_contents.as_bytes()).unwrap();

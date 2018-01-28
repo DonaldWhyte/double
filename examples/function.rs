@@ -3,21 +3,29 @@ extern crate double;
 
 use double::Mock;
 
-fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
-    weighting_fn(value * 2)
+fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+    // exclusive range
+    (min..max).map(func).collect()
+}
+
+fn test_function_used_correctly() {
+    // GIVEN:
+    let mock = Mock::<(i32), i32>::default();
+    mock.use_closure(Box::new(|x| x * 2));
+
+    // WHEN:
+    let sequence = generate_sequence(
+        &mock_func!(mock, i32, i32),
+        1,
+        5);
+
+    // THEN:
+    assert_eq!(vec!(2, 4, 6, 8), sequence);
+    assert!(mock.has_calls_exactly(vec!(
+      1, 2, 3, 4
+    )));
 }
 
 fn main() {
-    let mock = Mock::<i32, i32>::default();
-    mock.return_value(100);
-
-    let result = calculate_factor(42, &mock_function!(mock, i32, i32));
-
-    assert_eq!(100, result);
-    // Input argument should have be doubled by calculate_factor(), before it
-    // was passed into the weighting function.
-    assert!(mock.has_calls_exactly(
-        vec!(84)
-    ));
+    test_function_used_correctly();
 }
-
