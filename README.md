@@ -653,32 +653,49 @@ The authors of double argue that reimplenting the aforementined features is more
 `double::Mock` objects can also be used for free functions. Consider the following function:
 
 ```rust
-fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
-    weighting_fn(value * 2)
+fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+    // exclusive range
+    (min..max).map(func).collect()
 }
 ```
 
-This doubles some input value and applies a weighting to it. Suppose the weighting function can vary. For example, let's say the weighting function to use depends on user provided config. This means we need to pass a generic weighting function as a parameter.
+This iterates through a range of integers, mapping each integer to another integer using the supplied transformation function, `func`.
 
-Rather than generate your own mock weighting function boilerplate when testing `calculate_factor`, one can directly use `double::Mock`:
+Rather than generate your own mock transformation function boilerplate when testing `generate_sequence`, one can use `double`. double::Mock`
 
 ```rust
-fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
-    weighting_fn(value * 2)
+#[macro_use]
+extern crate double;
+
+use double::Mock;
+
+fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+    // exclusive range
+    (min..max).map(func).collect()
+}
+
+fn test_function_used_correctly() {
+    // GIVEN:
+    // Construct a `double::Mock` object directly.
+    // Format of generic params is: `<(arg_types...), retval_type>`.
+    let mock = Mock::<(i32), i32>::default();
+    mock.use_closure(Box::new(|x| x * 2));
+
+    // WHEN:
+    let sequence = generate_sequence(
+        // Wrap the mock object in a closure.
+        &mock_func!(mock, i32, i32),
+        1,
+        5);
+
+    // THEN:
+    assert_eq!(vec!(2, 4, 6, 8), sequence);
+    assert!(mock.has_calls_exactly(vec!(
+      1, 2, 3, 4
+    )));
 }
 
 fn main() {
-    let mock_weighting_fn = Mock::<i32, i32>::default();
-    mock_weighting_fn.return_value(100);
-
-    // Wrap mock in a closure that is passed to the function under test. Note
-    // how the closure is passed as a _reference_ for this
-    // (e.g. &|x: i32| ...)
-    let result = calculate_factor(42, &|x: i32| mock_weighting_fn.call(x));
-
-    assert_eq!(100, result);
-    assert!(mock_weighting_fn.has_calls_exactly(
-        vec!(84)  // input arg should be doubled by calculate_factor()
-    ));
+    test_function_used_correctly();
 }
 ```

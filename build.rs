@@ -129,7 +129,7 @@ fn generate_p_macro(max_args: usize) -> String {
 fn generate_p_macro_case_n(n_args: usize) -> String {
     if n_args == 0 {
         return "
-        ($func: ident) => (
+        ($func:ident) => (
             &|potential_match| -> bool {{ $func(potential_match) }}
         );".to_owned()
     } else {
@@ -142,7 +142,7 @@ fn generate_p_macro_case_n(n_args: usize) -> String {
         ).collect();
 
         format!("
-        ($func: ident, {}) => (
+        ($func:ident, {}) => (
             &|potential_match| -> bool {{ $func(potential_match, {}) }}
         );",
             case_args.join(", "),
@@ -150,14 +150,56 @@ fn generate_p_macro_case_n(n_args: usize) -> String {
     }
 }
 
-fn main() {
-    let file_contents = vec!(
-        generate_matcher_macro(MAX_ARGS),
-        generate_match_impls(MAX_ARGS),
-        generate_p_macro(MAX_ARGS)).join("\n\n");
+fn generate_mock_func_macro(max_args: usize) -> String {
+    assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
 
+    let arg_nums: Vec<usize> = (MIN_ARGS - 1..MAX_ARGS).collect();
+    let macro_cases: Vec<String> = arg_nums.iter().map(
+        |&i| generate_mock_func_macro_case_n(i)
+    ).collect();
+    format!(
+        "#[macro_export]\nmacro_rules! mock_func {{\n{}\n\n}}",
+        macro_cases.join("\n"))
+}
+
+fn generate_mock_func_macro_case_n(n_args: usize) -> String {
+    let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
+    let case_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$arg{}_type:ty", i.to_string())
+    ).collect();
+    let closure_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("arg{}: $arg{}_type", i.to_string(), i.to_string())
+    ).collect();
+    let mock_obj_func_call_args: Vec<String> = arg_nums.iter().map(
+        |&i| format!("arg{}", i.to_string())
+    ).collect();
+
+    format!("
+    ($mock_obj:ident, $retval:ty, {}) => (
+        &|{}| -> $retval {{ $mock_obj.call({}) }}
+    );",
+        case_args.join(", "),
+        closure_args.join(", "),
+        mock_obj_func_call_args.join(", "))
+}
+
+fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("matcher_generated.rs");
-    let mut f = File::create(&dest_path).unwrap();
-    f.write_all(file_contents.as_bytes()).unwrap();
+
+    {
+        let file_contents = vec!(
+            generate_matcher_macro(MAX_ARGS),
+            generate_match_impls(MAX_ARGS),
+            generate_p_macro(MAX_ARGS)).join("\n\n");
+        let dest_path = Path::new(&out_dir).join("matcher_generated.rs");
+        let mut f = File::create(&dest_path).unwrap();
+        f.write_all(file_contents.as_bytes()).unwrap();
+    }
+
+    {
+        let file_contents = generate_mock_func_macro(MAX_ARGS);
+        let dest_path = Path::new(&out_dir).join("macros_generated.rs");
+        let mut f = File::create(&dest_path).unwrap();
+        f.write_all(file_contents.as_bytes()).unwrap();
+    }
 }
