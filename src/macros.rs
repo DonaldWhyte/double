@@ -30,6 +30,10 @@ macro_rules! __private_mock_trait_new_impl {
     );
 }
 
+
+include!(concat!(env!("OUT_DIR"), "/macros_generated.rs"));
+
+
 /// Macro that generates a `struct` implementation of a trait.
 ///
 /// Use this instead of `mock_trait_no_default!` if all mocked method return

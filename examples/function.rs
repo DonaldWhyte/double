@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate double;
 
 use double::Mock;
@@ -7,14 +8,16 @@ fn calculate_factor(value: i32, weighting_fn: &Fn(i32) -> i32) -> i32 {
 }
 
 fn main() {
-    let mock_weighting_fn = Mock::<i32, i32>::default();
-    mock_weighting_fn.return_value(100);
+    let mock = Mock::<i32, i32>::default();
+    mock.return_value(100);
 
-    let result = calculate_factor(42, &|x: i32| mock_weighting_fn.call(x));
+    let result = calculate_factor(42, &mock_function!(mock, i32, i32));
 
     assert_eq!(100, result);
-    assert!(mock_weighting_fn.has_calls_exactly(
-        vec!(84)  // input arg should be doubled by calculate_factor()
+    // Input argument should have be doubled by calculate_factor(), before it
+    // was passed into the weighting function.
+    assert!(mock.has_calls_exactly(
+        vec!(84)
     ));
 }
 
