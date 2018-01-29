@@ -181,7 +181,7 @@ fn generate_mock_func_macro_case_n(n_args: usize, use_default: bool) -> String {
         |&i| format!("arg{}: $arg{}_type", i.to_string(), i.to_string())
     ).collect();
     let mock_obj_func_call_args: Vec<String> = arg_nums.iter().map(
-        |&i| format!("arg{}", i.to_string())
+        |&i| format!("arg{}.clone()", i.to_string())
     ).collect();
 
     let case_retval_default_arg = if use_default {

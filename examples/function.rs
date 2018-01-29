@@ -20,7 +20,7 @@ fn test_function_used_correctly() {
 
     // THEN:
     assert_eq!(vec!(2, 4, 6, 8), sequence);
-    assert!(mock.has_calls_exactly(vec!(
+    assert!(mock.has_calls_exactly_in_order(vec!(
       1, 2, 3, 4
     )));
 }
@@ -40,7 +40,7 @@ fn test_function_with_custom_defaults() {
 
     // THEN:
     assert_eq!(vec!(42, 42, 6, 42), sequence);
-    assert!(mock.has_calls_exactly(vec!(
+    assert!(mock.has_calls_exactly_in_order(vec!(
       1, 2, 3, 4
     )));
 }
