@@ -700,7 +700,7 @@ You specify the variable names that should store the generated mock object and c
 
 If the function's return type does not implement `Default`, then one must use the `mock_func_no_default!` macro, like so:
 
-```
+```rust
 // ...
 
 fn test_function_with_custom_defaults() {
