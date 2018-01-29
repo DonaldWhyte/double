@@ -661,13 +661,11 @@ fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
 
 This iterates through a range of integers, mapping each integer to another integer using the supplied transformation function, `func`.
 
-Rather than generate your own mock transformation function boilerplate when testing `generate_sequence`, one can use `double`. double::Mock`
+Rather than generate your own mock transformation function boilerplate when testing `generate_sequence`, one can use the macro `mock_func!`. This macro generates a `double::Mock` object and a closure that wraps it for you. For example:
 
 ```rust
 #[macro_use]
 extern crate double;
-
-use double::Mock;
 
 fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
     // exclusive range
@@ -676,17 +674,15 @@ fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
 
 fn test_function_used_correctly() {
     // GIVEN:
-    // Construct a `double::Mock` object directly.
-    // Format of generic params is: `<(arg_types...), retval_type>`.
-    let mock = Mock::<(i32), i32>::default();
+    mock_func!(
+        mock,     // name of variable that stores mock object
+        mock_fn,  // name of variable that stores closure wrapper
+        i32,      // return value type
+        i32);     // argument1 type
     mock.use_closure(Box::new(|x| x * 2));
 
     // WHEN:
-    let sequence = generate_sequence(
-        // Wrap the mock object in a closure.
-        &mock_func!(mock, i32, i32),
-        1,
-        5);
+    let sequence = generate_sequence(&mock_fn, 1, 5);
 
     // THEN:
     assert_eq!(vec!(2, 4, 6, 8), sequence);
@@ -697,5 +693,37 @@ fn test_function_used_correctly() {
 
 fn main() {
     test_function_used_correctly();
+}
+```
+
+You specify the variable names that should store the generated mock object and closure in the first two arguments of the `mock_func!` macro.
+
+If the function's return type does not implement `Default`, then one must use the `mock_func_no_default!` macro, like so:
+
+```
+// ...
+
+fn test_function_with_custom_defaults() {
+    // GIVEN:
+    mock_func_no_default!(
+        mock,
+        mock_fn,
+        i32,   // return value type
+        42,    // default return value
+        i32);  // argument1 type
+    mock.use_closure_for((3), Box::new(|x| x * 2));
+
+    // WHEN:
+    let sequence = generate_sequence(&mock_fn, 1, 5);
+
+    // THEN:
+    assert_eq!(vec!(42, 42, 6, 42), sequence);
+    assert!(mock.has_calls_exactly(vec!(
+      1, 2, 3, 4
+    )));
+}
+
+fn main() {
+    test_function_with_custom_defaults();
 }
 ```
