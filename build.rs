@@ -150,22 +150,32 @@ fn generate_p_macro_case_n(n_args: usize) -> String {
     }
 }
 
-fn generate_mock_func_macro(max_args: usize) -> String {
+fn generate_mock_func_macro(max_args: usize, use_default: bool) -> String {
     assert!(max_args >= MIN_ARGS && max_args <= MAX_ARGS);
+
+    let macro_name = if use_default {
+        "mock_func"
+    } else {
+        "mock_func_no_default"
+    };
 
     let arg_nums: Vec<usize> = (MIN_ARGS - 1..MAX_ARGS).collect();
     let macro_cases: Vec<String> = arg_nums.iter().map(
-        |&i| generate_mock_func_macro_case_n(i)
+        |&i| generate_mock_func_macro_case_n(i, use_default)
     ).collect();
     format!(
-        "#[macro_export]\nmacro_rules! mock_func {{\n{}\n\n}}",
+        "#[macro_export]\nmacro_rules! {} {{\n{}\n\n}}",
+        macro_name,
         macro_cases.join("\n"))
 }
 
-fn generate_mock_func_macro_case_n(n_args: usize) -> String {
+fn generate_mock_func_macro_case_n(n_args: usize, use_default: bool) -> String {
     let arg_nums: Vec<usize> = (MIN_ARGS..n_args + 1).collect();
     let case_args: Vec<String> = arg_nums.iter().map(
         |&i| format!("$arg{}_type:ty", i.to_string())
+    ).collect();
+    let mock_obj_arg_types: Vec<String> = arg_nums.iter().map(
+        |&i| format!("$arg{}_type", i.to_string())
     ).collect();
     let closure_args: Vec<String> = arg_nums.iter().map(
         |&i| format!("arg{}: $arg{}_type", i.to_string(), i.to_string())
@@ -174,11 +184,29 @@ fn generate_mock_func_macro_case_n(n_args: usize) -> String {
         |&i| format!("arg{}", i.to_string())
     ).collect();
 
+    let case_retval_default_arg = if use_default {
+        ""
+    } else {
+        "$retval_default:expr, "
+    };
+    let mock_obj_construction = if use_default {
+        format!(
+            "let $mock_obj = double::Mock::<({}), $retval>::default();",
+            mock_obj_arg_types.join(", "))
+    } else {
+        format!(
+            "let $mock_obj = double::Mock::<({}), $retval>::new($retval_default);",
+            mock_obj_arg_types.join(", "))
+    };
+
     format!("
-    ($mock_obj:ident, $retval:ty, {}) => (
-        &|{}| -> $retval {{ $mock_obj.call({}) }}
+    ($mock_obj:ident, $mock_fn:ident, $retval:ty, {}{}) => (
+        {}
+        let $mock_fn = &|{}| -> $retval {{ $mock_obj.call({}) }};
     );",
+        case_retval_default_arg,
         case_args.join(", "),
+        mock_obj_construction,
         closure_args.join(", "),
         mock_obj_func_call_args.join(", "))
 }
@@ -197,7 +225,9 @@ fn main() {
     }
 
     {
-        let file_contents = generate_mock_func_macro(MAX_ARGS);
+        let file_contents = vec!(
+            generate_mock_func_macro(MAX_ARGS, true),
+            generate_mock_func_macro(MAX_ARGS, false)).join("\n\n");
         let dest_path = Path::new(&out_dir).join("macros_generated.rs");
         let mut f = File::create(&dest_path).unwrap();
         f.write_all(file_contents.as_bytes()).unwrap();
