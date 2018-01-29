@@ -202,7 +202,7 @@ fn generate_mock_func_macro_case_n(n_args: usize, use_default: bool) -> String {
     format!("
     ($mock_obj:ident, $mock_fn:ident, $retval:ty, {}{}) => (
         {}
-        let $mock_fn = &|{}| -> $retval {{ $mock_obj.call({}) }};
+        let $mock_fn = |{}| -> $retval {{ $mock_obj.call({}) }};
     );",
         case_retval_default_arg,
         case_args.join(", "),
