@@ -536,7 +536,7 @@ If a `trait` provides a method that returns a type that _doesn't_ implement `Def
 
 For example:
 
-```
+```rust
 // `Result` does not implement the `Default` trait. Trying to mock `UserStore`
 // using the `mock_trait!` macro will fail. We use `mock_trait_no_default!`
 // instead.
