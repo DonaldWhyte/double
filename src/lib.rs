@@ -46,7 +46,7 @@
 //! }
 //! ```
 
-pub use mock::Mock;
+pub use crate::mock::Mock;
 
 pub mod macros;
 pub mod matcher;

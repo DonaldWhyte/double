@@ -345,7 +345,7 @@ impl<C, R> Mock<C, R>
         self.closures.borrow_mut().insert(args.into(), function);
     }
 
-    /// Returns true if `Mock::call` has been called.1
+    /// Returns true if `Mock::call` has been called.
     /// use double::Mock;
     ///
     /// let mock = Mock::<i64, ()>::default();
@@ -914,7 +914,7 @@ struct MatchInfo {
 impl MatchInfo {
     pub fn expectations_matched(&self) -> bool {
         let expected_indices: HashSet<usize> = HashSet::from_iter(
-            (0..self.num_expectations));
+            0..self.num_expectations);
         let expected_indices_matched = HashSet::from_iter(
             self.pattern_index_to_match_indices
             .keys()
