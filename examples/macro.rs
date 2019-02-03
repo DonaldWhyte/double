@@ -92,7 +92,7 @@ fn main() {
         Err("cannot delete, no user with given ID".to_owned()));
 
     store.get_user.return_value_for(
-        (42),
+        42,
         Ok(User{ name: "Donald".to_owned() }));
     assert_eq!(
         Err("cannot get, no user with given ID".to_owned()),
@@ -101,7 +101,7 @@ fn main() {
         Ok(User{ name: "Donald".to_owned() }),
         store.get_user(42));
 
-    store.delete_user.return_value_for((42), Ok(()));
+    store.delete_user.return_value_for(42, Ok(()));
     assert_eq!(
         Err("cannot delete, no user with given ID".to_owned()),
         store.delete_user(10));

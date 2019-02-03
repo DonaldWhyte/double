@@ -33,7 +33,7 @@ fn test_function_with_custom_defaults() {
         i32,   // return value type
         42,    // default return value
         i32);  // argument1 type
-    mock.use_closure_for((3), Box::new(|x| x * 2));
+    mock.use_closure_for(3, Box::new(|x| x * 2));
 
     // WHEN:
     let sequence = generate_sequence(&mock_fn, 1, 5);
