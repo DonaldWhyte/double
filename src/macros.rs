@@ -122,8 +122,8 @@ macro_rules! mock_trait {
             ),*
         }
 
-        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
-        __private_mock_trait_default_impl!($mock_name $(, $method)*);
+        $crate::__private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        $crate::__private_mock_trait_default_impl!($mock_name $(, $method)*);
     );
 
     (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
@@ -134,8 +134,8 @@ macro_rules! mock_trait {
             ),*
         }
 
-        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
-        __private_mock_trait_default_impl!($mock_name $(, $method)*);
+        $crate::__private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        $crate::__private_mock_trait_default_impl!($mock_name $(, $method)*);
     );
 }
 
@@ -226,7 +226,7 @@ macro_rules! mock_trait_no_default {
             ),*
         }
 
-        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        $crate::__private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
     );
 
     (pub $mock_name:ident $(, $method:ident($($arg_type:ty),* ) -> $retval:ty )* ) => (
@@ -237,7 +237,7 @@ macro_rules! mock_trait_no_default {
             ),*
         }
 
-        __private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
+        $crate::__private_mock_trait_new_impl!($mock_name $(, $method: $retval)*);
     );
 }
 
