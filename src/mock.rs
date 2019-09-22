@@ -7,7 +7,6 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::iter::FromIterator;
-use std::sync::{Arc, Mutex};
 use self::lazysort::SortedBy;
 
 /// Used for tracking function call arguments and specifying a predetermined
