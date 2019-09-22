@@ -59,7 +59,7 @@ pub fn between_inc<T: PartialEq + PartialOrd>(arg: &T, low: T, high: T) -> bool 
 
 /// Matcher that matches if `arg` is a populated `Option` whose stored value
 /// matches the specified `matcher`.
-pub fn is_some<T>(arg: &Option<T>, matcher: &Fn(&T) -> bool) -> bool {
+pub fn is_some<T>(arg: &Option<T>, matcher: &dyn Fn(&T) -> bool) -> bool {
     match *arg {
         Some(ref x) => matcher(x),
         None => false
@@ -68,7 +68,7 @@ pub fn is_some<T>(arg: &Option<T>, matcher: &Fn(&T) -> bool) -> bool {
 
 /// Matcher that matches if `arg` is a `Result::Ok` whose stored value matches
 /// the specified `matcher`.
-pub fn is_ok<T, U>(arg: &Result<T, U>, matcher: &Fn(&T) -> bool) -> bool {
+pub fn is_ok<T, U>(arg: &Result<T, U>, matcher: &dyn Fn(&T) -> bool) -> bool {
     match *arg {
         Ok(ref x) => matcher(x),
         Err(_) => false
@@ -77,7 +77,7 @@ pub fn is_ok<T, U>(arg: &Result<T, U>, matcher: &Fn(&T) -> bool) -> bool {
 
 /// Matcher that matches if `arg` is a `Result::Err` whose stored value matches
 /// the specified `matcher`.
-pub fn is_err<T, U>(arg: &Result<T, U>, matcher: &Fn(&U) -> bool) -> bool {
+pub fn is_err<T, U>(arg: &Result<T, U>, matcher: &dyn Fn(&U) -> bool) -> bool {
     match *arg {
         Ok(_) => false,
         Err(ref x) => matcher(x)
@@ -179,14 +179,14 @@ pub fn ne_nocase(arg: &str, string: &str) -> bool {
 // ============================================================================
 
 /// Matcher that matches if `arg` does _not_ match the specified `matcher`.
-pub fn not<T>(arg: &T, matcher: &Fn(&T) -> bool) -> bool {
+pub fn not<T>(arg: &T, matcher: &dyn Fn(&T) -> bool) -> bool {
     !matcher(arg)
 }
 
 /// Matcher that matches if `arg` matches *all* of the specified `matchers`. If
 /// at least one of `matchers` doesn't match with `arg`, this matcher doesn't
 /// match.
-pub fn all_of<T>(arg: &T, matchers: Vec<&Fn(&T) -> bool>) -> bool {
+pub fn all_of<T>(arg: &T, matchers: Vec<&dyn Fn(&T) -> bool>) -> bool {
     for matcher in matchers {
         if !matcher(arg) {
             return false
@@ -197,7 +197,7 @@ pub fn all_of<T>(arg: &T, matchers: Vec<&Fn(&T) -> bool>) -> bool {
 
 /// Matcher that matches if `arg` matches *any* of the specified `matchers`. If
 /// none of the `matchers` match with `arg`, this matcher doesn't match.
-pub fn any_of<T>(arg: &T, matchers: Vec<&Fn(&T) -> bool>) -> bool {
+pub fn any_of<T>(arg: &T, matchers: Vec<&dyn Fn(&T) -> bool>) -> bool {
     for matcher in matchers {
         if matcher(arg) {
             return true

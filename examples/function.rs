@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate double;
 
-fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+fn generate_sequence(func: &dyn Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
     // exclusive range
     (min..max).map(func).collect()
 }

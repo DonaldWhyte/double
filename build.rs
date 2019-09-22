@@ -71,7 +71,7 @@ fn generate_match_impl_n(n_args: usize) -> String {
     // the input arg as a one-tuple and will treat it is a single arg instead.
     if n_args == 1 {
         return "
-pub fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
+pub fn match_impl_1<A>(arg: &A, arg_matcher: &dyn Fn(&A) -> bool) -> bool {
     arg_matcher(arg)
 }".to_owned();
     }
@@ -85,7 +85,7 @@ pub fn match_impl_1<A>(arg: &A, arg_matcher: &Fn(&A) -> bool) -> bool {
     ).collect();
 
     let matcher_params: Vec<String> = type_param_names.iter().map(
-        |ref t| format!("&Fn(&{}) -> bool", t)
+        |ref t| format!("&dyn Fn(&{}) -> bool", t)
     ).collect();
 
     let matcher_invocations: Vec<String> = arg_number_range.iter().map(
