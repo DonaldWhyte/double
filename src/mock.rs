@@ -29,10 +29,10 @@ pub struct Mock<C, R>
     default_return_value: Ref<R>,
     return_value_sequence: Ref<Vec<R>>,
     default_fn: OptionalRef<fn(C) -> R>,
-    default_closure: OptionalRef<Box<Fn(C) -> R>>,
+    default_closure: OptionalRef<Box<dyn Fn(C) -> R>>,
     return_values: Ref<HashMap<C, R>>,
     fns: Ref<HashMap<C, fn(C) -> R>>,
-    closures: Ref<HashMap<C, Box<Fn(C) -> R>>>,
+    closures: Ref<HashMap<C, Box<dyn Fn(C) -> R>>>,
 
     calls: Ref<Vec<C>>,
 }
@@ -303,7 +303,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 1, 1)), 3);
     /// assert_eq!(mock.call((1, 2, 3,)), 6);
     /// ```
-    pub fn use_closure(&self, default_fn: Box<Fn(C) -> R>) {
+    pub fn use_closure(&self, default_fn: Box<dyn Fn(C) -> R>) {
         *self.default_fn.borrow_mut() = None;
         *self.default_closure.borrow_mut() = Some(default_fn)
     }
@@ -341,7 +341,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 1, 1)), 42);
     /// assert_eq!(mock.call((1, 2, 3)), 6);
     /// ```
-    pub fn use_closure_for<T: Into<C>>(&self, args: T, function: Box<Fn(C) -> R>) {
+    pub fn use_closure_for<T: Into<C>>(&self, args: T, function: Box<dyn Fn(C) -> R>) {
         self.closures.borrow_mut().insert(args.into(), function);
     }
 
@@ -596,7 +596,7 @@ impl<C, R> Mock<C, R>
     // types in concrete `impl`s. This would allow the matcher function
     // signature to be aliased, like below:
     //
-    // type Matcher = Fn(&C) -> bool;
+    // type Matcher = dyn Fn(&C) -> bool;
     //
     // TODO: define the above type alias when possible and use that instead of
     // explicitly defining the function signature everywhere.
@@ -628,8 +628,8 @@ impl<C, R> Mock<C, R>
     /// assert!(mock.called_with_pattern(&pattern2));
     /// assert!(!mock.called_with_pattern(&pattern3));
     /// ```
-    pub fn called_with_pattern(&self, pattern: &Fn(&C) -> bool) -> bool {
-        let patterns: Vec<&Fn(&C) -> bool> = vec!(pattern);
+    pub fn called_with_pattern(&self, pattern: &dyn Fn(&C) -> bool) -> bool {
+        let patterns: Vec<&dyn Fn(&C) -> bool> = vec!(pattern);
         self.get_match_info_pattern(patterns).expectations_matched()
     }
 
@@ -657,7 +657,7 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.has_patterns(vec!(&pattern3)));
     /// assert!(!mock.has_patterns(vec!(&pattern1, &pattern3)));
     /// ```
-    pub fn has_patterns(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+    pub fn has_patterns(&self, patterns: Vec<&dyn Fn(&C) -> bool>) -> bool {
         self.get_match_info_pattern(patterns).expectations_matched()
     }
 
@@ -690,7 +690,7 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.has_patterns_in_order(vec!(&pattern3)));
     /// assert!(!mock.has_patterns_in_order(vec!(&pattern1, &pattern3)));
     /// ```
-    pub fn has_patterns_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+    pub fn has_patterns_in_order(&self, patterns: Vec<&dyn Fn(&C) -> bool>) -> bool {
         self.get_match_info_pattern(patterns).expectations_matched_in_order()
     }
 
@@ -722,7 +722,7 @@ impl<C, R> Mock<C, R>
     /// assert!(mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern1)));
     /// assert!(!mock.has_patterns_exactly(vec!(&pattern1, &pattern2, &pattern3)));
     /// ```
-    pub fn has_patterns_exactly(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+    pub fn has_patterns_exactly(&self, patterns: Vec<&dyn Fn(&C) -> bool>) -> bool {
         self.get_match_info_pattern(patterns).expectations_matched_exactly()
     }
 
@@ -756,7 +756,7 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.has_patterns_exactly_in_order(vec!(&pattern3)));
     /// assert!(!mock.has_patterns_exactly_in_order(vec!(&pattern1, &pattern3)));
     /// ```
-    pub fn has_patterns_exactly_in_order(&self, patterns: Vec<&Fn(&C) -> bool>) -> bool {
+    pub fn has_patterns_exactly_in_order(&self, patterns: Vec<&dyn Fn(&C) -> bool>) -> bool {
         self.get_match_info_pattern(patterns).expectations_matched_in_order_exactly()
     }
 
@@ -791,7 +791,7 @@ impl<C, R> Mock<C, R>
         }
     }
 
-    fn get_match_info_pattern(&self, patterns: Vec<&Fn(&C) -> bool>) -> MatchInfo {
+    fn get_match_info_pattern(&self, patterns: Vec<&dyn Fn(&C) -> bool>) -> MatchInfo {
         // Build map from pattern (its index) to the indices of the actual
         // calls made to the mock whose args match that pattern.
         let mut pattern_index_to_match_indices: HashMap<usize, Vec<usize>> =

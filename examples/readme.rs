@@ -6,7 +6,7 @@ trait BalanceSheet {
     fn profit(&self, revenue: u32, costs: u32) -> i32;
 }
 
-fn double_profit(revenue: u32, costs: u32, balance_sheet: &BalanceSheet) -> i32 {
+fn double_profit(revenue: u32, costs: u32, balance_sheet: &dyn BalanceSheet) -> i32 {
     balance_sheet.profit(revenue, costs) * 2
 }
 

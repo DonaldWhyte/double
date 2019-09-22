@@ -134,11 +134,11 @@ These behaviours are configured by invoking methods on the mock objects themselv
 
 | Method | What It Does |
 | ------ | ------------ |
-| `use_fn_for((args), Fn(...) -> retval)` | invoke given function and return the value it returns when specified `(args)` are passed in |
-| `use_closure_for((args), &Fn(...) -> retval)` | invoke given closure and return the value it returns when specified `(args)` are passed in |
+| `use_fn_for((args), dyn Fn(...) -> retval)` | invoke given function and return the value it returns when specified `(args)` are passed in |
+| `use_closure_for((args), &dyn Fn(...) -> retval)` | invoke given closure and return the value it returns when specified `(args)` are passed in |
 | `return_value_for((args), val)` | return `val` when specified `(args)` are passed in |
-| `use_fn(Fn(...) -> retval)` | invoke given function and return the value it returns by default |
-| `use_closure(&Fn(...) -> retval)` | invoke given closure and return the value it returns by default |
+| `use_fn(dyn Fn(...) -> retval)` | invoke given function and return the value it returns by default |
+| `use_closure(&dyn Fn(...) -> retval)` | invoke given closure and return the value it returns by default |
 | `return_values(vec<retval>)` | return values in given vector by default, return one value for each invocation of the mock method. If there are no more values in the vector, return the default value specified by `return_value()`  |
 | `return_value(val)` | return `val` by default |
 
@@ -653,7 +653,7 @@ The authors of double argue that reimplenting the aforementined features is more
 `double::Mock` objects can also be used for free functions. Consider the following function:
 
 ```rust
-fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+fn generate_sequence(func: &dyn Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
     // exclusive range
     (min..max).map(func).collect()
 }
@@ -667,7 +667,7 @@ Rather than generate your own mock transformation function boilerplate when test
 #[macro_use]
 extern crate double;
 
-fn generate_sequence(func: &Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
+fn generate_sequence(func: &dyn Fn(i32) -> i32, min: i32, max: i32) -> Vec<i32> {
     // exclusive range
     (min..max).map(func).collect()
 }
