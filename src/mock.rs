@@ -7,11 +7,8 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::iter::FromIterator;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use self::lazysort::SortedBy;
-
-type Ref<T> = Rc<RefCell<T>>;
-type OptionalRef<T> = Rc<RefCell<Option<T>>>;
 
 /// Used for tracking function call arguments and specifying a predetermined
 /// return value or mock function.
@@ -26,15 +23,15 @@ pub struct Mock<C, R>
           R: Clone
 {
     // Ordered from lowest precedence to highest
-    default_return_value: Ref<R>,
-    return_value_sequence: Ref<Vec<R>>,
-    default_fn: OptionalRef<fn(C) -> R>,
-    default_closure: OptionalRef<Box<dyn Fn(C) -> R>>,
-    return_values: Ref<HashMap<C, R>>,
-    fns: Ref<HashMap<C, fn(C) -> R>>,
-    closures: Ref<HashMap<C, Box<dyn Fn(C) -> R>>>,
+    default_return_value: ThreadSafeRef<R>,
+    return_value_sequence: ThreadSafeRef<Vec<R>>,
+    default_fn: OptionalThreadSafeRef<fn(C) -> R>,
+    default_closure: OptionalThreadSafeRef<Box<dyn Fn(C) -> R>>,
+    return_values: ThreadSafeRef<HashMap<C, R>>,
+    fns: ThreadSafeRef<HashMap<C, fn(C) -> R>>,
+    closures: ThreadSafeRef<HashMap<C, Box<dyn Fn(C) -> R>>>,
 
-    calls: Ref<Vec<C>>,
+    calls: ThreadSafeRef<Vec<C>>,
 }
 
 impl<C, R> Mock<C, R>
@@ -44,14 +41,14 @@ impl<C, R> Mock<C, R>
     /// Creates a new `Mock` that will return `return_value`.
     pub fn new<T: Into<R>>(return_value: T) -> Self {
         Mock {
-            default_return_value: Ref::new(RefCell::new(return_value.into())),
-            return_value_sequence: Ref::new(RefCell::new(Vec::new())),
-            default_fn: OptionalRef::new(RefCell::new(None)),
-            default_closure: OptionalRef::new(RefCell::new(None)),
-            return_values: Ref::new(RefCell::new(HashMap::new())),
-            fns: Ref::new(RefCell::new(HashMap::new())),
-            closures: Ref::new(RefCell::new(HashMap::new())),
-            calls: Ref::new(RefCell::new(vec![])),
+            default_return_value: create_thread_safe_rec(return_value.into()),
+            return_value_sequence: create_thread_safe_rec(Vec::new()),
+            default_fn: create_thread_safe_rec(None),
+            default_closure: create_thread_safe_rec(None),
+            return_values: create_thread_safe_rec(HashMap::new()),
+            fns: create_thread_safe_rec(HashMap::new()),
+            closures: create_thread_safe_rec(HashMap::new()),
+            calls: create_thread_safe_rec(vec![]),
         }
     }
 
@@ -104,25 +101,26 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call("  banana  "), "banana  ");
     /// ```
     pub fn call(&self, args: C) -> R {
-        self.calls.borrow_mut().push(args.clone());
+        lock_or_panic_mut(&self.calls).push(args.clone());
 
-        if let Some(ref closure) = self.closures.borrow().get(&args) {
+        if let Some(ref closure) = lock_or_panic(&self.closures).get(&args) {
             return closure(args)
-        } else if let Some(ref function) = self.fns.borrow().get(&args) {
+        } else if let Some(ref function) = lock_or_panic(&self.fns).get(&args) {
             return function(args)
-        } else if let Some(return_value) = self.return_values.borrow().get(&args) {
+        } else if let Some(return_value) = lock_or_panic(&self.return_values).get(&args) {
             return return_value.clone()
-        } else if let Some(ref default_fn) = *self.default_fn.borrow() {
+        } else if let Some(ref default_fn) = *lock_or_panic(&self.default_fn) {
             return default_fn(args);
-        } else if let Some(ref default_closure) = *self.default_closure.borrow() {
+        } else if let Some(ref default_closure) = *lock_or_panic(&self.default_closure) {
             return default_closure(args);
         } else {
             // If there are no return values in the value sequence left, fall
             // back to the configured default value.
-            let ref mut sequence = *self.return_value_sequence.borrow_mut();
+            let ref mut sequence = *lock_or_panic_mut(
+                &self.return_value_sequence);
             match sequence.pop() {
                 Some(return_value) => return_value,
-                None => self.default_return_value.borrow().clone()
+                None => lock_or_panic(&self.default_return_value).clone()
             }
         }
     }
@@ -140,7 +138,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call("something"), "new value");
     /// ```
     pub fn return_value<T: Into<R>>(&self, value: T) {
-        *self.default_return_value.borrow_mut() = value.into();
+        *lock_or_panic_mut(&self.default_return_value) = value.into();
     }
 
     /// Provide a sequence of default return values. The specified are returned
@@ -162,7 +160,7 @@ impl<C, R> Mock<C, R>
     pub fn return_values<T: Into<R>>(&self, values: Vec<T>) {
         // Reverse so efficient back pop() can be used to extract  the next
         // value in the sequence
-        *self.return_value_sequence.borrow_mut() = values
+        *lock_or_panic_mut(&self.return_value_sequence) = values
             .into_iter()
             .map(|r| r.into())
             .rev()
@@ -184,9 +182,8 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call("banana"), "tasty");
     /// ```
     pub fn return_value_for<S: Into<C>, T: Into<R>>(&self, args: S, return_value: T) {
-        self.return_values.borrow_mut().insert(
-            args.into(),
-            return_value.into());
+        let ret_vals = lock_or_panic_mut(&self.return_values);
+        ret_vals.insert(args.into(), return_value.into());
     }
 
     /// Specify a function to determine the `Mock`'s return value based on
@@ -226,8 +223,8 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 2, 3,)), 6);
     /// ```
     pub fn use_fn(&self, default_fn: fn(C) -> R) {
-        *self.default_closure.borrow_mut() = None;
-        *self.default_fn.borrow_mut() = Some(default_fn)
+        *lock_or_panic_mut(&self.default_closure) = None;
+        *lock_or_panic_mut(&self.default_fn) = Some(default_fn)
     }
 
     /// Specify a function to determine the `Mock`'s return value based on
@@ -270,7 +267,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 2, 3)), 6);
     /// ```
     pub fn use_fn_for<T: Into<C>>(&self, args: T, function: fn(C) -> R) {
-        self.fns.borrow_mut().insert(args.into(), function);
+        lock_or_panic_mut(&self.fns).insert(args.into(), function);
     }
 
     /// Specify a closure to determine the `Mock`'s return value based on
@@ -304,8 +301,8 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 2, 3,)), 6);
     /// ```
     pub fn use_closure(&self, default_fn: Box<dyn Fn(C) -> R>) {
-        *self.default_fn.borrow_mut() = None;
-        *self.default_closure.borrow_mut() = Some(default_fn)
+        *lock_or_panic_mut(&self.default_fn) = None;
+        *lock_or_panic_mut(&self.default_closure) = Some(default_fn)
     }
 
     /// Specify a closure to determine the `Mock`'s return value based on
@@ -342,7 +339,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.call((1, 2, 3)), 6);
     /// ```
     pub fn use_closure_for<T: Into<C>>(&self, args: T, function: Box<dyn Fn(C) -> R>) {
-        self.closures.borrow_mut().insert(args.into(), function);
+        lock_or_panic_mut(&self.closures).insert(args.into(), function);
     }
 
     /// Returns true if `Mock::call` has been called.
@@ -357,7 +354,7 @@ impl<C, R> Mock<C, R>
     /// assert!(mock.called());
     /// ```
     pub fn called(&self) -> bool {
-        !self.calls.borrow().is_empty()
+        !lock_or_panic(&self.calls).is_empty()
     }
 
     /// Returns the number of times `Mock::call` has been called.
@@ -376,7 +373,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.num_calls(), 2);
     /// ```
     pub fn num_calls(&self) -> usize {
-        self.calls.borrow().len()
+        lock_or_panic(&self.calls).len()
     }
 
     /// Returns the arguments to `Mock::call` in order from first to last.
@@ -395,7 +392,7 @@ impl<C, R> Mock<C, R>
     /// assert_eq!(mock.calls().as_slice(), ["first", "second", "third"]);
     /// ```
     pub fn calls(&self) -> Vec<C> {
-        self.calls.borrow().clone()
+        lock_or_panic(&self.calls).clone()
     }
 
     /// Reset the call history for the `Mock`.
@@ -423,7 +420,7 @@ impl<C, R> Mock<C, R>
     /// assert!(!mock.called_with("second"));
     /// ```
     pub fn reset_calls(&self) {
-        self.calls.borrow_mut().clear()
+        lock_or_panic_mut(&self.calls).clear()
     }
 }
 
@@ -773,7 +770,8 @@ impl<C, R> Mock<C, R>
         // actual calls made to the mock whose args match that tuple exactly.
         let mut pattern_index_to_match_indices: HashMap<usize, Vec<usize>> =
             HashMap::new();
-        for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
+        let calls = lock_or_panic(&self.calls);
+        for (call_index, call_args) in calls.iter().enumerate() {
             for (expected_index, expected_args) in expected_calls_c.iter().enumerate() {
                 if call_args == expected_args {
                     pattern_index_to_match_indices
@@ -786,7 +784,7 @@ impl<C, R> Mock<C, R>
 
         MatchInfo {
             num_expectations: expected_calls_c.len(),
-            num_actual_calls: self.calls.borrow().len(),
+            num_actual_calls: lock_or_panic(&self.calls).len(),
             pattern_index_to_match_indices: pattern_index_to_match_indices,
         }
     }
@@ -796,7 +794,8 @@ impl<C, R> Mock<C, R>
         // calls made to the mock whose args match that pattern.
         let mut pattern_index_to_match_indices: HashMap<usize, Vec<usize>> =
             HashMap::new();
-        for (call_index, call_args) in self.calls.borrow().iter().enumerate() {
+        let calls = lock_or_panic(&self.calls);
+        for (call_index, call_args) in calls.iter().enumerate() {
             for (expected_index, pattern_fn) in patterns.iter().enumerate() {
                 if pattern_fn(call_args) {
                     pattern_index_to_match_indices
@@ -809,7 +808,7 @@ impl<C, R> Mock<C, R>
 
         MatchInfo {
             num_expectations: patterns.len(),
-            num_actual_calls: self.calls.borrow().len(),
+            num_actual_calls: lock_or_panic(&self.calls).len(),
             pattern_index_to_match_indices: pattern_index_to_match_indices,
         }
     }
